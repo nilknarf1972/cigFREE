@@ -1,5 +1,5 @@
 /**
- * Clear Path (cigFREE) — Pure Core Domain Engine
+ * CigFree™ (Working Title: Clear Path) — Pure Core Domain Engine
  * © 2026 The Primo IT Tech LLC. All Rights Reserved.
  *
  * Implements deterministic, unit-tested calculations for:
@@ -7,16 +7,20 @@
  * - Compassionate setback recovery (never erasing past smoke-free days or milestones)
  * - Optional cigarette & financial savings estimates with transparent formulas
  * - Milestone recognition & preservation
- * - Visual intensity & advance content warning filtering
+ * - Signature Feature: Photo Mode repeatable sequence state machine
+ * - Personalized Reminders with discreet-by-default lock-screen protection
  * - Theme & accessibility resolution
  * - Image license/consent ledger management
  * - Local data export & deletion
  */
 
 import {
+  BENEFIT_CARDS,
   DEFAULT_IMAGE_JOURNEY_CARDS,
   LEGAL_AND_PRICING_CONFIG,
-  MILESTONE_DEFINITIONS
+  MILESTONE_DEFINITIONS,
+  MOTIVATION_REASONS,
+  PHOTO_MODE_CALMING_STEPS
 } from '../data/clearPathData.js';
 
 export const STORAGE_KEY = 'clear_path_primo_state_v1';
@@ -53,21 +57,49 @@ export function parseISODateToUTCMs(isoDateString) {
 }
 
 /**
- * Creates a clean default user state for Clear Path.
+ * Normalizes intensity values so 'no_graphic' and 'hide_graphic' are treated equivalently.
+ */
+export function normalizeVisualIntensity(intensity = 'direct') {
+  if (intensity === 'no_graphic' || intensity === 'hide_graphic') {
+    return 'no_graphic';
+  }
+  if (intensity === 'gentle') {
+    return 'gentle';
+  }
+  return 'direct';
+}
+
+/**
+ * Creates a clean default user state for Clear Path / CigFree.
  */
 export function createDefaultUserState(todayISO = normalizeDateISO()) {
   const normalizedToday = normalizeDateISO(todayISO);
   return {
-    schemaVersion: '1.0.0',
+    schemaVersion: '1.2.0',
     ownerCompany: LEGAL_AND_PRICING_CONFIG.companyName,
     onboardingCompleted: false,
     quitDateISO: normalizedToday,
-    visualIntensity: 'direct', // 'direct' | 'gentle' | 'hide_graphic'
+    visualIntensity: 'direct', // 'direct' | 'gentle' | 'no_graphic'
     estimateSettings: {
       enabled: false,
       cigarettesPerDay: '',
       costPerPack: '',
       cigarettesPerPack: 20
+    },
+    photoModeConfig: {
+      roundLength: 3, // 3 or 5 difficult images per round
+      warningAcknowledgedForIntensity: null, // null until first session warning is accepted; resets when intensity changes
+      completedRoundsCount: 0
+    },
+    reminderSettings: {
+      enabled: false,
+      paused: false,
+      daysOfWeek: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      timesOfDay: ['09:00'],
+      frequency: 'daily', // 'daily' | 'twice_daily' | 'selected_days'
+      includeQuitProgress: true,
+      enableImageInNotification: false,
+      lockScreenImageConfirmed: false
     },
     selectedMotivations: ['health', 'breathing'],
     customMotivations: [],
@@ -121,16 +153,12 @@ export function calculateQuitProgress(state, referenceDateISO = normalizeDateISO
   const isTodayMarkedSmokeFree = logs[todayISO]?.status === 'smoke_free';
   const isTodayMarkedSetback = logs[todayISO]?.status === 'setback';
 
-  // Effective smoke-free days combine elapsed days since quit date (minus any logged setbacks in that span)
-  // plus today if marked smoke-free on day 0, or total explicitly logged smoke-free days if higher (so resetting
-  // a quit date never erases past logged smoke-free days).
   const elapsedSmokeFreeSpan = isFutureQuitDate
     ? 0
     : Math.max(0, daysSinceQuitDate + (isTodayMarkedSmokeFree ? 1 : 0) - setbacksSinceQuitDate);
 
   const effectiveSmokeFreeDays = Math.max(smokeFreeDaysCount, elapsedSmokeFreeSpan);
 
-  // Calculate current consecutive explicitly-marked smoke-free streak up to today (or yesterday if today is unmarked)
   let currentStreakDays = 0;
   let cursorMs = isTodayMarkedSmokeFree ? todayMs : todayMs - msPerDay;
   while (true) {
@@ -299,10 +327,6 @@ export function recordCalendarDayStatus(state, dateISO, status, note = '') {
 
 /**
  * Handles a smoking setback with compassion, preserving past smoke-free days and milestones.
- * Options:
- * - 'log_and_keep_date': Logs the setback on dateISO and keeps the current quitDateISO.
- * - 'reset_quit_date_keep_history': Logs the setback on dateISO, sets quitDateISO to dateISO,
- *   and preserves all previous smoke-free days and unlocked milestones.
  */
 export function handleCompassionateSetback(
   state,
@@ -356,7 +380,7 @@ export function updateQuitDateWithoutJudgment(state, newQuitDateISO, referenceDa
 /**
  * Filters the educational image deck according to the user's selected visual intensity:
  * - 'gentle': excludes 'direct' images
- * - 'hide_graphic': excludes 'direct' images
+ * - 'no_graphic' / 'hide_graphic': excludes 'direct' images
  * - 'direct': includes both 'gentle' and 'direct' images (direct images remain gated behind an advance warning)
  */
 export function filterImagesForIntensity(
@@ -364,7 +388,8 @@ export function filterImagesForIntensity(
   visualIntensity = 'gentle'
 ) {
   const list = Array.isArray(images) ? images : DEFAULT_IMAGE_JOURNEY_CARDS;
-  if (visualIntensity === 'direct') {
+  const normalized = normalizeVisualIntensity(visualIntensity);
+  if (normalized === 'direct') {
     return list.map((img) => ({
       ...img,
       requiresExplicitWarningGate: Boolean(img.intensity === 'direct' || img.requiresAdvanceWarning)
@@ -379,11 +404,348 @@ export function filterImagesForIntensity(
 }
 
 /**
- * Determines whether to offer an optional inspirational pause card after every N images (default 3).
+ * Determines whether to offer an optional inspirational pause card after every N images (default 3 or 5).
  */
 export function shouldShowInspirationalInterlude(imagesViewedCount, cadence = 3) {
   const safeCadence = Number(cadence) >= 3 && Number(cadence) <= 5 ? Number(cadence) : 3;
   return Number.isInteger(imagesViewedCount) && imagesViewedCount > 0 && imagesViewedCount % safeCadence === 0;
+}
+
+// ============================================================================
+// SIGNATURE FEATURE: PHOTO MODE SEQUENCE ENGINE
+// ============================================================================
+
+/**
+ * Builds the ordered Photo Mode round deck based on user's intensity setting.
+ * In 'direct' mode, prioritizes rights-cleared difficult pathology photos first so each round
+ * delivers the selected 3 or 5 difficult images before transitioning to calming encouragement.
+ */
+export function getPhotoModeDeck(allCards = DEFAULT_IMAGE_JOURNEY_CARDS, visualIntensity = 'direct') {
+  const normalized = normalizeVisualIntensity(visualIntensity);
+  const filtered = filterImagesForIntensity(allCards, normalized);
+  if (normalized === 'direct') {
+    const directCards = filtered.filter((c) => c.intensity === 'direct');
+    const gentleCards = filtered.filter((c) => c.intensity !== 'direct');
+    return [...directCards, ...gentleCards];
+  }
+  return filtered;
+}
+
+/**
+ * Selects a concise, positive reason to quit for Step 5 of Photo Mode, combining the user's
+ * chosen personal motivations and medically reviewed public-health benefits.
+ */
+export function selectPositiveReasonToQuit(userState, roundNumber = 1) {
+  const safeState = userState || createDefaultUserState();
+  const selectedIds = safeState.selectedMotivations || ['health'];
+  const customList = safeState.customMotivations || [];
+
+  const matchedMotivations = MOTIVATION_REASONS.filter((m) => selectedIds.includes(m.id));
+  const pool =
+    matchedMotivations.length > 0 ? matchedMotivations : MOTIVATION_REASONS;
+  const chosenMotivation = pool[(roundNumber - 1) % pool.length];
+
+  const matchedBenefits = BENEFIT_CARDS.filter(
+    (b) => b.relatedMotivation === chosenMotivation.id
+  );
+  const chosenBenefit =
+    matchedBenefits.length > 0
+      ? matchedBenefits[(roundNumber - 1) % matchedBenefits.length]
+      : BENEFIT_CARDS[(roundNumber - 1) % BENEFIT_CARDS.length];
+
+  const customReason =
+    customList.length > 0 ? customList[(roundNumber - 1) % customList.length] : null;
+
+  return {
+    motivationLabel: customReason || chosenMotivation.label,
+    motivationDescription: customReason
+      ? `Your personal goal: "${customReason}"`
+      : chosenMotivation.description,
+    benefitTitle: chosenBenefit.title,
+    benefitSummary: chosenBenefit.summary,
+    benefitCitation: chosenBenefit.sourceCitation
+  };
+}
+
+/**
+ * Initializes a Photo Mode session.
+ * Enforces Rule 1: Show a brief content warning before the first session and whenever the user
+ * changes the image intensity setting.
+ * Enforces Rule 2: Let the user choose a session length of 3 or 5 difficult images per round.
+ * Enforces Rule 7: Never autoplay (`autoplay: false`).
+ */
+export function createPhotoModeSession(userState, allCards = DEFAULT_IMAGE_JOURNEY_CARDS) {
+  const safeState = userState || createDefaultUserState();
+  const normalizedIntensity = normalizeVisualIntensity(safeState.visualIntensity);
+  const config = safeState.photoModeConfig || {};
+  const roundLength = Number(config.roundLength) === 5 ? 5 : 3;
+
+  const warningAcknowledgedFor = config.warningAcknowledgedForIntensity || null;
+  const requiresContentWarning = warningAcknowledgedFor !== normalizedIntensity;
+
+  const deck = getPhotoModeDeck(allCards, normalizedIntensity);
+
+  return {
+    step: requiresContentWarning ? 'content_warning' : 'difficult_image',
+    visualIntensity: normalizedIntensity,
+    roundLength, // 3 or 5
+    roundNumber: 1,
+    imageIndexInRound: 0, // 0 .. roundLength - 1
+    deckCursor: 0,
+    deckLength: deck.length,
+    isPaused: false,
+    autoplay: false,
+    skippedCount: 0,
+    viewedCount: 0
+  };
+}
+
+/**
+ * Acknowledges the brief content warning before the first session or after an intensity change,
+ * transitioning Photo Mode into Step 3 (showing Image 1 of 3 or 5).
+ */
+export function acknowledgePhotoModeWarning(userState, session) {
+  const safeState = userState || createDefaultUserState();
+  const normalizedIntensity = normalizeVisualIntensity(safeState.visualIntensity);
+  const nextUserState = {
+    ...safeState,
+    photoModeConfig: {
+      ...(safeState.photoModeConfig || {}),
+      roundLength: session?.roundLength === 5 ? 5 : 3,
+      warningAcknowledgedForIntensity: normalizedIntensity
+    }
+  };
+  const nextSession = {
+    ...session,
+    visualIntensity: normalizedIntensity,
+    step: 'difficult_image',
+    imageIndexInRound: 0,
+    isPaused: false
+  };
+  return { nextUserState, nextSession };
+}
+
+/**
+ * Changes the Photo Mode round length (3 or 5 difficult images per round).
+ */
+export function changePhotoModeRoundLength(userState, session, newRoundLength) {
+  const validLength = Number(newRoundLength) === 5 ? 5 : 3;
+  const nextUserState = {
+    ...(userState || createDefaultUserState()),
+    photoModeConfig: {
+      ...(userState?.photoModeConfig || {}),
+      roundLength: validLength
+    }
+  };
+  const nextSession = {
+    ...session,
+    roundLength: validLength,
+    imageIndexInRound: Math.min(session?.imageIndexInRound || 0, validLength - 1)
+  };
+  return { nextUserState, nextSession };
+}
+
+/**
+ * Changes the image intensity setting ('direct' | 'gentle' | 'no_graphic').
+ * Rule 1: Whenever the user changes the image intensity setting, show the brief content warning.
+ */
+export function changePhotoModeIntensity(
+  userState,
+  session,
+  newIntensity,
+  allCards = DEFAULT_IMAGE_JOURNEY_CARDS
+) {
+  const safeState = userState || createDefaultUserState();
+  const prevNormalized = normalizeVisualIntensity(safeState.visualIntensity);
+  const nextNormalized = normalizeVisualIntensity(newIntensity);
+  const nextDeck = getPhotoModeDeck(allCards, nextNormalized);
+
+  const didChange = prevNormalized !== nextNormalized;
+
+  const nextUserState = {
+    ...safeState,
+    visualIntensity: nextNormalized,
+    photoModeConfig: {
+      ...(safeState.photoModeConfig || {}),
+      warningAcknowledgedForIntensity: didChange
+        ? null
+        : safeState.photoModeConfig?.warningAcknowledgedForIntensity
+    }
+  };
+
+  const nextSession = {
+    ...session,
+    visualIntensity: nextNormalized,
+    step: didChange ? 'content_warning' : session.step,
+    imageIndexInRound: 0,
+    deckCursor: 0,
+    deckLength: nextDeck.length,
+    isPaused: false
+  };
+
+  return { nextUserState, nextSession };
+}
+
+/**
+ * Advances Photo Mode through its repeatable sequence:
+ * 1. 'content_warning' -> 'difficult_image' (1 of 3 or 5)
+ * 2. 'difficult_image' (1..N) -> 'calming_encouragement' (after N images)
+ * 3. 'calming_encouragement' -> 'reason_to_quit' (positive reason to quit + round choice)
+ */
+export function advancePhotoModeSession(session, wasSkipped = false) {
+  if (!session) return null;
+
+  if (session.step === 'content_warning') {
+    return {
+      ...session,
+      step: 'difficult_image',
+      imageIndexInRound: 0,
+      isPaused: false
+    };
+  }
+
+  if (session.step === 'difficult_image') {
+    const nextViewed = wasSkipped ? session.viewedCount : session.viewedCount + 1;
+    const nextSkipped = wasSkipped ? session.skippedCount + 1 : session.skippedCount;
+    const nextCursor =
+      session.deckLength > 0 ? (session.deckCursor + 1) % session.deckLength : 0;
+
+    if (session.imageIndexInRound + 1 < session.roundLength) {
+      return {
+        ...session,
+        imageIndexInRound: session.imageIndexInRound + 1,
+        deckCursor: nextCursor,
+        viewedCount: nextViewed,
+        skippedCount: nextSkipped,
+        isPaused: false
+      };
+    }
+
+    // Completed the selected number (3 or 5) of difficult images -> show calming encouragement
+    return {
+      ...session,
+      step: 'calming_encouragement',
+      deckCursor: nextCursor,
+      viewedCount: nextViewed,
+      skippedCount: nextSkipped,
+      isPaused: false
+    };
+  }
+
+  if (session.step === 'calming_encouragement') {
+    return {
+      ...session,
+      step: 'reason_to_quit',
+      isPaused: false
+    };
+  }
+
+  return session;
+}
+
+/**
+ * Rule 6: If the user chooses to continue with another round, begin the next round with difficult images.
+ */
+export function startNextPhotoModeRound(userState, session) {
+  const safeState = userState || createDefaultUserState();
+  const nextUserState = {
+    ...safeState,
+    photoModeConfig: {
+      ...(safeState.photoModeConfig || {}),
+      completedRoundsCount: (safeState.photoModeConfig?.completedRoundsCount || 0) + 1
+    }
+  };
+
+  const nextSession = {
+    ...session,
+    roundNumber: (session?.roundNumber || 1) + 1,
+    step: 'difficult_image',
+    imageIndexInRound: 0,
+    isPaused: false
+  };
+
+  return { nextUserState, nextSession };
+}
+
+/**
+ * Retrieves the active calming card for the current round.
+ */
+export function getCalmingCardForRound(roundNumber = 1) {
+  const idx = Math.max(0, roundNumber - 1) % PHOTO_MODE_CALMING_STEPS.length;
+  return PHOTO_MODE_CALMING_STEPS[idx];
+}
+
+// ============================================================================
+// PERSONALIZED REMINDERS ENGINE (DISCREET BY DEFAULT)
+// ============================================================================
+
+/**
+ * Updates the user's Personalized Reminder settings while enforcing lock-screen image safety.
+ */
+export function updateReminderSettings(userState, patch = {}) {
+  const safeState = userState || createDefaultUserState();
+  const current = safeState.reminderSettings || createDefaultUserState().reminderSettings;
+  const merged = {
+    ...current,
+    ...patch
+  };
+
+  // If image notifications are turned off, reset the explicit lock-screen confirmation
+  if (!merged.enableImageInNotification) {
+    merged.lockScreenImageConfirmed = false;
+  }
+
+  return {
+    ...safeState,
+    reminderSettings: merged
+  };
+}
+
+/**
+ * Builds the notification payload for Personalized Reminders.
+ * - Discreet by default: never shows graphic images or sensitive health details on the lock screen.
+ * - Default copy: "Your progress is waiting—open Clear Path when you’re ready."
+ * - If includeQuitProgress is true, includes accurate, encouraging, nonjudgmental progress
+ *   without guilt or implying a setback erases progress.
+ * - Only includes an image if BOTH enableImageInNotification AND lockScreenImageConfirmed are true.
+ */
+export function buildReminderNotificationPayload(
+  userState,
+  referenceDateISO = normalizeDateISO()
+) {
+  const safeState = userState || createDefaultUserState(referenceDateISO);
+  const reminders = safeState.reminderSettings || createDefaultUserState().reminderSettings;
+  const progress = calculateQuitProgress(safeState, referenceDateISO);
+
+  const isActive = Boolean(reminders.enabled && !reminders.paused);
+  const showsImageOnLockScreen = Boolean(
+    reminders.enableImageInNotification && reminders.lockScreenImageConfirmed
+  );
+
+  let bodyText = 'Your progress is waiting—open Clear Path when you’re ready.';
+  if (reminders.includeQuitProgress) {
+    const days = progress.effectiveSmokeFreeDays;
+    bodyText =
+      days > 0
+        ? `Your progress is waiting (${days} smoke-free day${days === 1 ? '' : 's'} saved)—open Clear Path when you’re ready.`
+        : 'Your progress is waiting—every smoke-free choice counts. Open Clear Path when you’re ready.';
+  }
+
+  return {
+    isActive,
+    isEnabled: Boolean(reminders.enabled),
+    isPaused: Boolean(reminders.paused),
+    title: 'Clear Path • CigFree™ Check-In',
+    body: bodyText,
+    discreetLockScreenDefault: !showsImageOnLockScreen,
+    showsImageOnLockScreen,
+    attachedImageUrl: showsImageOnLockScreen
+      ? '/images/pathology/lung-emphysema-cdc.jpg'
+      : null,
+    scheduleSummary: `${reminders.frequency === 'twice_daily' ? 'Twice daily' : 'Selected days'} (${(
+      reminders.daysOfWeek || []
+    ).join(', ')}) at ${(reminders.timesOfDay || ['09:00']).join(', ')}`
+  };
 }
 
 /**

@@ -76,30 +76,30 @@ export const OFFICIAL_SMOKING_WARNINGS = [
 export const VISUAL_INTENSITY_OPTIONS = [
   {
     id: 'direct',
-    label: 'Direct (Real Medical Photos)',
-    badge: 'Real Pathology + Warnings',
+    label: 'Direct',
+    badge: 'Real Medical Photos + Warnings',
     shortDescription:
       'Shows real-life cleared medical photos of smoker lungs, throat, lips, gums, tongue & arteries (with advance content warning & Skip button).',
     details:
-      'Mixes real Public Domain / Creative Commons clinical pathology photographs of smoking damage with educational facts and recovery encouragement. Every graphic image includes a content warning and instant Skip button.'
+      'Includes real Public Domain / Creative Commons clinical pathology photographs of smoking damage alongside educational facts. Every graphic image includes a content warning and instant Skip button.'
   },
   {
     id: 'gentle',
-    label: 'Gentle (Diagrams Only)',
-    badge: 'Non-Graphic',
+    label: 'Gentle',
+    badge: 'Educational Diagrams',
     shortDescription:
       'Hides real clinical pathology photos and shows calm educational vector illustrations.',
     details:
       'Shows supportive diagrams of lung renewal, oxygen transport, and positive habits. Automatically hides graphic real-life pathology photographs.'
   },
   {
-    id: 'hide_graphic',
-    label: 'Hide Graphic Images',
+    id: 'no_graphic',
+    label: 'No graphic images',
     badge: 'Uplifting Only',
     shortDescription:
       'Strictly hides all real clinical pathology photos and intense health-impact imagery.',
     details:
-      'Displays only peaceful restorative diagrams and milestone encouragement. You can switch modes in 1 click at any time.'
+      'Displays only peaceful restorative diagrams and milestone encouragement. You can change your choice in Settings at any time.'
   }
 ];
 
@@ -856,3 +856,56 @@ export const REGIONAL_HELP_RESOURCES = [
     ]
   }
 ];
+
+export const PHOTO_MODE_CALMING_STEPS = [
+  {
+    id: 'calm-sunrise-breath',
+    title: 'Pause & Exhale — You Are Choosing Health Right Now',
+    illustrationType: 'sunrise-horizon',
+    visualCategoryBadge: 'Calming Encouragement — Original Cleared Artwork',
+    caption: 'A quiet sunrise horizon reminding you that your body begins recovering the moment you stop smoking.',
+    screenReaderDescription:
+      'A calm sunrise glowing over peaceful green hills and a winding clear path.',
+    supportiveQuote:
+      '“Facing the reality of what tobacco does takes courage. Every single cigarette you choose not to smoke is an act of kindness toward your future self.”'
+  },
+  {
+    id: 'calm-forest-stream',
+    title: 'Steady & Strong — One Round, One Day at a Time',
+    illustrationType: 'forest-breeze',
+    visualCategoryBadge: 'Calming Encouragement — Original Cleared Artwork',
+    caption: 'Sunlight filtering through tall evergreen trees beside a clear stream.',
+    screenReaderDescription:
+      'Warm sunlight streaming through peaceful evergreen trees alongside calm water.',
+    supportiveQuote:
+      '“You do not have to be perfect to make real progress. Every smoke-free hour stays in your corner permanently.”'
+  },
+  {
+    id: 'calm-harbor-beacon',
+    title: 'You Are Stronger Than a 5-Minute Craving',
+    illustrationType: 'harbor-beacon',
+    visualCategoryBadge: 'Calming Encouragement — Original Cleared Artwork',
+    caption: 'A tranquil coastal lighthouse guiding a steady course across calm water.',
+    screenReaderDescription:
+      'A warm lighthouse beam shining across tranquil evening water.',
+    supportiveQuote:
+      '“Cravings are temporary waves that crest and fade in minutes. Your lungs, throat, gums, and heart will thank you for years.”'
+  }
+];
+
+export const REMINDER_DAYS_OF_WEEK = [
+  { id: 'Mon', label: 'Mon' },
+  { id: 'Tue', label: 'Tue' },
+  { id: 'Wed', label: 'Wed' },
+  { id: 'Thu', label: 'Thu' },
+  { id: 'Fri', label: 'Fri' },
+  { id: 'Sat', label: 'Sat' },
+  { id: 'Sun', label: 'Sun' }
+];
+
+export const REMINDER_FREQUENCY_OPTIONS = [
+  { id: 'daily', label: 'Once Daily (Selected Days)' },
+  { id: 'twice_daily', label: 'Twice Daily (Morning & Evening)' },
+  { id: 'selected_days', label: 'Custom Days Only' }
+];
+

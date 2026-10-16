@@ -27,14 +27,23 @@ Create a polished, supportive cigarette-cessation app for iOS and Android. Worki
    - Offer a choice of visual intensity: **“Gentle,” “Direct,”** or **“Hide graphic images.”** Make it easy to change later.
    - Explain that graphic images can be upsetting and let users skip them at any time.
 
-2. **Image-Based Motivation**:
-   - Create a **“View the next image”** experience with a clear **Next** button, **image counter**, and **Skip** option.
-   - Do **not** show graphic images automatically, unexpectedly, or without an advance content warning.
-   - Use only images that are **legally cleared for this specific use**: documented licenses or written, informed permission from the photographer and identifiable people shown. Do not scrape images, assume online availability means permission, or generate fake images presented as real patient photos.
-   - Provide a built-in **Image Rights & Consent Ledger** to record each image’s source, license or consent status, permitted uses, and any required attribution.
-   - Where real-life patient photographs are not yet licensed, use clearly labeled **non-graphic educational illustrations** (`[Educational Illustration — Not a Real Patient Photo]`).
-   - After every 3–5 images, offer an **optional inspirational image** and a concise, encouraging reason to quit. Let users **continue, pause, or leave** the experience.
-   - Keep language compassionate and non-shaming. Never imply that someone deserves illness or that relapse is failure.
+2. **Signature Feature: Photo Mode & Image-Based Motivation**:
+   - Create a dedicated **“Photo Mode”** that guides the user through a repeatable sequence of difficult images, calming encouragement, and reasons to quit while keeping the user in complete control:
+     1. Show a brief **content warning** before the first session and whenever the user changes the image intensity setting (**“Direct,” “Gentle,”** or **“No graphic images”**).
+     2. Let the user choose a session length of **3 or 5 difficult images per round**.
+     3. Show **one image at a time**, with a clear **Next** button, **progress indicator** (`Round X • Image Y of 3/5`), and **Skip** or **Exit** option.
+     4. After the selected number of images (`3` or `5`), show a **calming, inspirational image and supportive quote**.
+     5. Then show **one concise, positive reason to quit**, combining a personal motivation the user selected and a medically reviewed benefit.
+     6. Offer the choice to **continue with another round, pause, or finish the session**. If they continue, begin the next round with difficult images.
+     7. **Never autoplay**, surprise the user with graphic content, or make it difficult to stop or leave Photo Mode.
+   - Use real-life cancer or smoking-related pathology images only when documented rights and required consent exist (e.g., U.S. Government Public Domain CDC PHIL / NIH / NCI and verified Creative Commons clinical datasets), and provide a built-in **Image Rights & Consent Ledger** recording each image’s source, creator, license/consent status, permitted uses, and attribution requirements.
+
+2b. **Personalized Reminders (Discreet Lock-Screen Default)**:
+   - Allow users to opt in to reminders for Photo Mode, choosing **days of the week, times, frequency**, and whether reminders include their **quit progress**.
+   - Keep notifications **discreet by default**: never show graphic images or sensitive health details on the lock screen (`“Your progress is waiting—open Clear Path when you’re ready.”`).
+   - Only show an image in a notification if the user **explicitly enables image notifications AND confirms they understand it may be visible on their device’s lock screen**.
+   - Provide easy one-tap controls to **pause, change, or turn off reminders**.
+   - Progress in reminders is always accurate, encouraging, and nonjudgmental—never guilt-based and never implying a setback erases past progress.
 
 3. **Benefits and Encouragement**:
    - Present quitting benefits in short, readable cards. Use conservative educational wording grounded in public health sources (CDC, WHO, U.S. Surgeon General, American Lung Association) and cite trustworthy sources inside the app.

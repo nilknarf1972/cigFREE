@@ -5,10 +5,16 @@ import path from 'node:path';
 
 import {
   STORAGE_KEY,
+  acknowledgePhotoModeWarning,
+  advancePhotoModeSession,
+  buildReminderNotificationPayload,
   calculateQuitProgress,
   calculateSavingsEstimates,
+  changePhotoModeIntensity,
+  changePhotoModeRoundLength,
   createCustomImageLicenseRecord,
   createDefaultUserState,
+  createPhotoModeSession,
   deleteAllUserData,
   evaluateMilestones,
   exportUserDataJSON,
@@ -17,11 +23,14 @@ import {
   recordCalendarDayStatus,
   resolveEffectiveTheme,
   shouldShowInspirationalInterlude,
-  updateQuitDateWithoutJudgment
+  startNextPhotoModeRound,
+  updateQuitDateWithoutJudgment,
+  updateReminderSettings
 } from '../src/engine/clearPathEngine.js';
 import {
   DEFAULT_IMAGE_JOURNEY_CARDS,
-  LEGAL_AND_PRICING_CONFIG
+  LEGAL_AND_PRICING_CONFIG,
+  VISUAL_INTENSITY_OPTIONS
 } from '../src/data/clearPathData.js';
 
 test('1. Quit-date calculations track elapsed days, smoke-free logs, future dates, and preserve history on setback', () => {
@@ -172,3 +181,115 @@ test('5. Data export, data deletion, image license ledger, and The Primo IT Tech
     /does not promise or represent any specific net amount after app-store fees or taxes/
   );
 });
+
+test('6. Signature Feature: Photo Mode enforces content warning on first session & intensity change, 3 or 5 round length, calming encouragement, positive reason to quit, and next round', () => {
+  const optionLabels = VISUAL_INTENSITY_OPTIONS.map((o) => o.label);
+  assert.deepEqual(optionLabels, ['Direct', 'Gentle', 'No graphic images']);
+
+  let userState = createDefaultUserState('2026-10-01');
+
+  // 1. First session starts at content_warning and never autoplays
+  let session = createPhotoModeSession(userState);
+  assert.equal(session.step, 'content_warning');
+  assert.equal(session.autoplay, false);
+  assert.equal(session.roundLength, 3);
+
+  // 2. Choose 5 images per round before starting
+  ({ nextUserState: userState, nextSession: session } = changePhotoModeRoundLength(userState, session, 5));
+  assert.equal(session.roundLength, 5);
+  assert.equal(userState.photoModeConfig.roundLength, 5);
+
+  // Switch back to 3 images per round for test progression
+  ({ nextUserState: userState, nextSession: session } = changePhotoModeRoundLength(userState, session, 3));
+  assert.equal(session.roundLength, 3);
+
+  // Acknowledge content warning -> enters difficult_image 1 of 3 (imageIndexInRound === 0)
+  ({ nextUserState: userState, nextSession: session } = acknowledgePhotoModeWarning(userState, session));
+  assert.equal(session.step, 'difficult_image');
+  assert.equal(session.roundNumber, 1);
+  assert.equal(session.imageIndexInRound, 0);
+  assert.equal(userState.photoModeConfig.warningAcknowledgedForIntensity, 'direct');
+
+  // 3. Advance through 3 difficult images -> transitions to calming_encouragement
+  session = advancePhotoModeSession(session, false); // Image 1 -> Image 2
+  assert.equal(session.step, 'difficult_image');
+  assert.equal(session.imageIndexInRound, 1);
+
+  session = advancePhotoModeSession(session, true); // Image 2 -> Image 3 (with skip)
+  assert.equal(session.step, 'difficult_image');
+  assert.equal(session.imageIndexInRound, 2);
+  assert.equal(session.skippedCount, 1);
+
+  session = advancePhotoModeSession(session, false); // Image 3 -> calming_encouragement
+  assert.equal(session.step, 'calming_encouragement');
+
+  // 4. Advance from calming_encouragement -> reason_to_quit (with round completion choices)
+  session = advancePhotoModeSession(session, false);
+  assert.equal(session.step, 'reason_to_quit');
+
+  // 5. Start next round -> begins Round 2 with difficult_image 1 (imageIndexInRound === 0)
+  ({ nextUserState: userState, nextSession: session } = startNextPhotoModeRound(userState, session));
+  assert.equal(session.roundNumber, 2);
+  assert.equal(session.step, 'difficult_image');
+  assert.equal(session.imageIndexInRound, 0);
+  assert.equal(userState.photoModeConfig.completedRoundsCount, 1);
+
+  // 6. Changing intensity setting re-triggers content_warning
+  ({ nextUserState: userState, nextSession: session } = changePhotoModeIntensity(userState, session, 'gentle'));
+  assert.equal(session.visualIntensity, 'gentle');
+  assert.equal(session.step, 'content_warning');
+});
+
+test('7. Personalized Reminders enforce discreet lock-screen default, accurate nonjudgmental progress, and explicit lock-screen image confirmation gate', () => {
+  let state = createDefaultUserState('2026-10-01');
+  state = recordCalendarDayStatus(state, '2026-10-05', 'smoked_setback', 'Had 1 cigarette');
+
+  // When includeQuitProgress is false, notification shows the exact discreet lock-screen message
+  state = updateReminderSettings(state, { includeQuitProgress: false });
+  const discreetOnlyPayload = buildReminderNotificationPayload(state, '2026-10-11');
+  assert.equal(
+    discreetOnlyPayload.body,
+    'Your progress is waiting—open Clear Path when you’re ready.'
+  );
+  assert.equal(discreetOnlyPayload.showsImageOnLockScreen, false);
+  assert.equal(discreetOnlyPayload.attachedImageUrl, null);
+  assert.equal(discreetOnlyPayload.discreetLockScreenDefault, true);
+
+  // Opt in with progress included, still discreet lock-screen image off
+  state = updateReminderSettings(state, {
+    enabled: true,
+    includeQuitProgress: true,
+    daysOfWeek: ['Mon', 'Wed', 'Fri'],
+    timesOfDay: ['08:30', '19:00'],
+    frequency: 'twice_daily'
+  });
+  const progressPayload = buildReminderNotificationPayload(state, '2026-10-11');
+  assert.equal(progressPayload.isActive, true);
+  assert.equal(progressPayload.showsImageOnLockScreen, false);
+  assert.match(progressPayload.body, /10 smoke-free days saved/);
+  assert.doesNotMatch(progressPayload.body, /fail|shame|erased|guilt/i);
+
+  // Attempting to enable enableImageInNotification WITHOUT lockScreenImageConfirmed must not show lock-screen image
+  state = updateReminderSettings(state, {
+    enableImageInNotification: true,
+    lockScreenImageConfirmed: false
+  });
+  const unconfirmedPayload = buildReminderNotificationPayload(state, '2026-10-11');
+  assert.equal(unconfirmedPayload.showsImageOnLockScreen, false);
+  assert.equal(unconfirmedPayload.attachedImageUrl, null);
+
+  // Explicitly enabling enableImageInNotification AND confirming lockScreenImageConfirmed allows image in notification
+  state = updateReminderSettings(state, {
+    enableImageInNotification: true,
+    lockScreenImageConfirmed: true
+  });
+  const confirmedPayload = buildReminderNotificationPayload(state, '2026-10-11');
+  assert.equal(confirmedPayload.showsImageOnLockScreen, true);
+  assert.ok(confirmedPayload.attachedImageUrl);
+
+  // Easy control to pause reminders
+  state = updateReminderSettings(state, { paused: true });
+  const pausedPayload = buildReminderNotificationPayload(state, '2026-10-11');
+  assert.equal(pausedPayload.isActive, false);
+});
+

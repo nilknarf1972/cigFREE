@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   ArrowLeft,
   Award,
+  Bell,
+  BellOff,
   BookOpen,
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -24,6 +25,7 @@ import {
   Moon,
   PauseCircle,
   PhoneCall,
+  PlayCircle,
   RefreshCw,
   Settings as SettingsIcon,
   Share2,
@@ -33,8 +35,8 @@ import {
   Sparkles,
   Sun,
   Trash2,
-  Unlock,
-  Wind
+  Wind,
+  XCircle
 } from 'lucide-react';
 import EducationalIllustration from './components/EducationalIllustration.jsx';
 import {
@@ -42,39 +44,50 @@ import {
   CRAVING_SUPPORT_TOOLKIT,
   DEFAULT_IMAGE_JOURNEY_CARDS,
   DIFFICULT_DAY_AFFIRMATIONS,
-  INSPIRATIONAL_PAUSE_CARDS,
   LEGAL_AND_PRICING_CONFIG,
   MOTIVATION_REASONS,
   OFFICIAL_SMOKING_WARNINGS,
   REGIONAL_HELP_RESOURCES,
+  REMINDER_DAYS_OF_WEEK,
+  REMINDER_FREQUENCY_OPTIONS,
   VISUAL_INTENSITY_OPTIONS
 } from './data/clearPathData.js';
 import {
   STORAGE_KEY,
+  acknowledgePhotoModeWarning,
+  advancePhotoModeSession,
+  buildReminderNotificationPayload,
   calculateQuitProgress,
   calculateSavingsEstimates,
+  changePhotoModeIntensity,
+  changePhotoModeRoundLength,
   createCustomImageLicenseRecord,
   createDefaultUserState,
+  createPhotoModeSession,
   deleteAllUserData,
   evaluateMilestones,
   exportUserDataJSON,
-  filterImagesForIntensity,
+  getCalmingCardForRound,
+  getPhotoModeDeck,
   handleCompassionateSetback,
   normalizeDateISO,
+  normalizeVisualIntensity,
   recordCalendarDayStatus,
   resolveEffectiveTheme,
-  shouldShowInspirationalInterlude,
-  updateQuitDateWithoutJudgment
+  selectPositiveReasonToQuit,
+  startNextPhotoModeRound,
+  updateQuitDateWithoutJudgment,
+  updateReminderSettings
 } from './engine/clearPathEngine.js';
 
 const SCREEN_TABS = [
-  { id: 'today', label: 'Today & Daily Shock', shortLabel: 'Today', icon: Flame },
-  { id: 'images', label: 'Real Photo Deck (12)', shortLabel: 'Photos', icon: ImageIcon },
+  { id: 'today', label: 'Today Dashboard', shortLabel: 'Today', icon: Sun },
+  { id: 'images', label: '★ Photo Mode', shortLabel: 'Photo Mode', icon: ImageIcon },
   { id: 'benefits', label: 'Benefits & Cravings', shortLabel: 'Benefits', icon: Heart },
   { id: 'calendar', label: 'Quit Calendar', shortLabel: 'Calendar', icon: CalendarIcon },
   { id: 'milestones', label: 'Milestones', shortLabel: 'Milestones', icon: Award },
   { id: 'onboarding', label: 'Quick Setup', shortLabel: 'Setup', icon: Compass },
-  { id: 'settings', label: 'Settings & Legal', shortLabel: 'Settings', icon: SettingsIcon },
+  { id: 'settings', label: 'Settings & Reminders', shortLabel: 'Settings', icon: SettingsIcon },
   { id: 'help', label: 'Quitline Help', shortLabel: 'Get Help', icon: LifeBuoy }
 ];
 
@@ -100,13 +113,10 @@ export default function App() {
   const [activeScreen, setActiveScreen] = useState('today');
   const [systemPrefersDark, setSystemPrefersDark] = useState(false);
 
-  // Image Journey & Daily Shock state
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [imagesViewedSessionCount, setImagesViewedSessionCount] = useState(0);
-  const [revealedDirectImageIds, setRevealedDirectImageIds] = useState({});
-  const [sessionKeepPhotosRevealed, setSessionKeepPhotosRevealed] = useState(false);
-  const [activeInspirationalPause, setActiveInspirationalPause] = useState(null);
-  const [journeyPaused, setJourneyPaused] = useState(false);
+  // Signature Feature: Photo Mode state machine
+  const [photoSession, setPhotoSession] = useState(() =>
+    createPhotoModeSession(createDefaultUserState(todayISO))
+  );
   const [showLicenseLedgerModal, setShowLicenseLedgerModal] = useState(false);
   const [newLicenseForm, setNewLicenseForm] = useState({
     title: '',
@@ -121,6 +131,10 @@ export default function App() {
     caption: ''
   });
   const [licenseFormError, setLicenseFormError] = useState('');
+
+  // Personalized Reminder new time input
+  const [newReminderTimeInput, setNewReminderTimeInput] = useState('18:00');
+  const [testNotificationBanner, setTestNotificationBanner] = useState(null);
 
   // Today / Setback / Craving Timer state
   const [showSetbackFlow, setShowSetbackFlow] = useState(false);
@@ -153,15 +167,31 @@ export default function App() {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
+        const defaults = createDefaultUserState(todayISO);
         const merged = {
-          ...createDefaultUserState(todayISO),
+          ...defaults,
           ...parsed,
+          visualIntensity: normalizeVisualIntensity(parsed.visualIntensity || defaults.visualIntensity),
           estimateSettings: {
-            ...createDefaultUserState(todayISO).estimateSettings,
+            ...defaults.estimateSettings,
             ...(parsed.estimateSettings || {})
+          },
+          photoModeConfig: {
+            ...defaults.photoModeConfig,
+            ...(parsed.photoModeConfig || {})
+          },
+          reminderSettings: {
+            ...defaults.reminderSettings,
+            ...(parsed.reminderSettings || {})
           }
         };
         setUserState(merged);
+        setPhotoSession(
+          createPhotoModeSession(merged, [
+            ...DEFAULT_IMAGE_JOURNEY_CARDS,
+            ...(merged.customImageRecords || [])
+          ])
+        );
         setQuitDateEditInput(merged.quitDateISO || todayISO);
         setActiveScreen(merged.onboardingCompleted ? 'today' : 'onboarding');
       } else {
@@ -210,7 +240,7 @@ export default function App() {
     root.setAttribute('data-reduced-motion', String(Boolean(userState.reducedMotion)));
   }, [effectiveTheme, userState.textScale, userState.highContrast, userState.reducedMotion]);
 
-  // 5-Minute Craving Delay Timer countdown
+  // 5-Minute Craving Delay Timer countdown (Note: Photo Mode NEVER autoplays; this timer is only for optional craving pause)
   useEffect(() => {
     if (cravingTimerSeconds <= 0) return undefined;
     const interval = window.setInterval(() => {
@@ -238,16 +268,29 @@ export default function App() {
     [userState.customImageRecords]
   );
 
-  const filteredImages = useMemo(
-    () => filterImagesForIntensity(allImageCards, userState.visualIntensity),
+  const photoModeDeck = useMemo(
+    () => getPhotoModeDeck(allImageCards, userState.visualIntensity),
     [allImageCards, userState.visualIntensity]
   );
 
-  const safeImageIndex =
-    filteredImages.length > 0 ? currentImageIndex % filteredImages.length : 0;
-  const currentImageCard = filteredImages[safeImageIndex] || null;
+  const safeDeckCursor =
+    photoModeDeck.length > 0 ? (photoSession.deckCursor || 0) % photoModeDeck.length : 0;
+  const currentPhotoCard = photoModeDeck[safeDeckCursor] || null;
+  const currentCalmingCard = useMemo(
+    () => getCalmingCardForRound(photoSession.roundNumber),
+    [photoSession.roundNumber]
+  );
+  const currentReasonToQuit = useMemo(
+    () => selectPositiveReasonToQuit(userState, photoSession.roundNumber),
+    [userState, photoSession.roundNumber]
+  );
   const currentOfficialWarning =
     OFFICIAL_SMOKING_WARNINGS[activeWarningIdx % OFFICIAL_SMOKING_WARNINGS.length];
+
+  const reminderPayload = useMemo(
+    () => buildReminderNotificationPayload(userState, todayISO),
+    [userState, todayISO]
+  );
 
   const showTemporaryStatus = (msg) => {
     setStatusBanner(msg);
@@ -256,30 +299,120 @@ export default function App() {
     }, 5000);
   };
 
-  // Jump directly to a specific organ card (auto-enabling Direct Mode if needed so user can see it!)
-  const handleSelectOrganCard = (cardId) => {
-    const targetCard = allImageCards.find((c) => c.id === cardId);
-    if (!targetCard) return;
+  // ============================================================================
+  // PHOTO MODE HANDLERS (STRICT USER CONTROL, NO AUTOPLAY)
+  // ============================================================================
 
-    const nextIntensity =
-      targetCard.intensity === 'direct' && userState.visualIntensity !== 'direct'
-        ? 'direct'
-        : userState.visualIntensity;
+  const handleOpenPhotoMode = () => {
+    setPhotoSession((prev) => {
+      const normalized = normalizeVisualIntensity(userState.visualIntensity);
+      const needsWarning =
+        userState.photoModeConfig?.warningAcknowledgedForIntensity !== normalized;
+      return {
+        ...prev,
+        visualIntensity: normalized,
+        roundLength: Number(userState.photoModeConfig?.roundLength) === 5 ? 5 : 3,
+        deckLength: photoModeDeck.length,
+        step: needsWarning ? 'content_warning' : prev.step === 'finished' ? 'difficult_image' : prev.step,
+        isPaused: false
+      };
+    });
+    setActiveScreen('images');
+  };
 
-    if (nextIntensity !== userState.visualIntensity) {
-      setUserState((prev) => ({ ...prev, visualIntensity: 'direct' }));
-    }
+  const handleAcknowledgeWarningAndBeginRound = () => {
+    const { nextUserState, nextSession } = acknowledgePhotoModeWarning(userState, {
+      ...photoSession,
+      deckLength: photoModeDeck.length
+    });
+    setUserState(nextUserState);
+    setPhotoSession(nextSession);
+  };
 
-    const nextDeck = filterImagesForIntensity(allImageCards, nextIntensity);
-    const idx = nextDeck.findIndex((c) => c.id === cardId);
-    if (idx >= 0) {
-      setCurrentImageIndex(idx);
-      setActiveInspirationalPause(null);
-      setJourneyPaused(false);
+  const handlePhotoModeRoundLengthChange = (lengthVal) => {
+    const { nextUserState, nextSession } = changePhotoModeRoundLength(
+      userState,
+      photoSession,
+      lengthVal
+    );
+    setUserState(nextUserState);
+    setPhotoSession(nextSession);
+  };
+
+  const handleIntensityChangeEverywhere = (newIntensity) => {
+    const { nextUserState, nextSession } = changePhotoModeIntensity(
+      userState,
+      photoSession,
+      newIntensity,
+      allImageCards
+    );
+    setUserState(nextUserState);
+    setPhotoSession(nextSession);
+    showTemporaryStatus(
+      `Visual intensity set to "${
+        VISUAL_INTENSITY_OPTIONS.find((o) => o.id === normalizeVisualIntensity(newIntensity))?.label
+      }". A brief content notice will appear before your next Photo Mode round.`
+    );
+  };
+
+  const handleAdvancePhotoStep = (wasSkipped = false) => {
+    setActiveWarningIdx((prev) => prev + 1);
+    setPhotoSession((prev) =>
+      advancePhotoModeSession(
+        {
+          ...prev,
+          deckLength: photoModeDeck.length
+        },
+        wasSkipped
+      )
+    );
+    if (wasSkipped) {
+      showTemporaryStatus('Skipped image. You remain in complete control of Photo Mode.');
     }
   };
 
-  // Handlers
+  const handleStartNextRound = () => {
+    const { nextUserState, nextSession } = startNextPhotoModeRound(userState, {
+      ...photoSession,
+      deckLength: photoModeDeck.length
+    });
+    setUserState(nextUserState);
+    setPhotoSession(nextSession);
+    showTemporaryStatus(`Starting Round ${nextSession.roundNumber} (${nextSession.roundLength} images).`);
+  };
+
+  const handleExitPhotoMode = () => {
+    setPhotoSession((prev) => ({
+      ...prev,
+      isPaused: false
+    }));
+    setActiveScreen('today');
+    showTemporaryStatus('Exited Photo Mode. Your progress is saved.');
+  };
+
+  const handleJumpToOrganInPhotoMode = (cardId) => {
+    const targetCard = allImageCards.find((c) => c.id === cardId);
+    if (!targetCard) return;
+
+    if (targetCard.intensity === 'direct' && normalizeVisualIntensity(userState.visualIntensity) !== 'direct') {
+      handleIntensityChangeEverywhere('direct');
+      return;
+    }
+
+    const idx = photoModeDeck.findIndex((c) => c.id === cardId);
+    if (idx >= 0) {
+      setPhotoSession((prev) => ({
+        ...prev,
+        deckCursor: idx,
+        isPaused: false
+      }));
+    }
+  };
+
+  // ============================================================================
+  // GENERAL HANDLERS
+  // ============================================================================
+
   const handleCompleteOnboarding = (e) => {
     if (e) e.preventDefault();
     setUserState((prev) => ({
@@ -287,9 +420,7 @@ export default function App() {
       onboardingCompleted: true
     }));
     setActiveScreen('today');
-    showTemporaryStatus(
-      'Setup complete! Showing your Daily Reality Check & Quit Dashboard.'
-    );
+    showTemporaryStatus('Setup complete! Welcome to your Today dashboard & Photo Mode.');
   };
 
   const handleMarkTodaySmokeFree = () => {
@@ -301,7 +432,7 @@ export default function App() {
     );
     setUserState(updated);
     setSetbackResultMessage(null);
-    showTemporaryStatus('Awesome job! Today is locked in as CigFree.');
+    showTemporaryStatus('Awesome job! Today is locked in as Smoke-Free.');
   };
 
   const handleSetbackChoice = (option) => {
@@ -316,27 +447,6 @@ export default function App() {
     setSetbackResultMessage(compassionateResponse);
     setShowSetbackFlow(false);
     setSetbackNote('');
-  };
-
-  const handleNextImage = (wasSkipped = false) => {
-    if (filteredImages.length === 0) return;
-    const nextViewedCount = imagesViewedSessionCount + 1;
-    setImagesViewedSessionCount(nextViewedCount);
-    setJourneyPaused(false);
-    setActiveWarningIdx((prev) => prev + 1);
-
-    if (shouldShowInspirationalInterlude(nextViewedCount, 3)) {
-      const pauseCardIndex =
-        Math.floor(nextViewedCount / 3 - 1) % INSPIRATIONAL_PAUSE_CARDS.length;
-      setActiveInspirationalPause(INSPIRATIONAL_PAUSE_CARDS[pauseCardIndex]);
-    } else {
-      setActiveInspirationalPause(null);
-      setCurrentImageIndex((prev) => (prev + 1) % filteredImages.length);
-    }
-
-    if (wasSkipped) {
-      showTemporaryStatus('Skipped image. You are always in control of what you view.');
-    }
   };
 
   const handleToggleMotivation = (id) => {
@@ -408,12 +518,12 @@ export default function App() {
   const handleConfirmDeleteAllData = () => {
     const fresh = deleteAllUserData(window.localStorage, todayISO);
     setUserState(fresh);
+    setPhotoSession(createPhotoModeSession(fresh));
     setQuitDateEditInput(todayISO);
     setConfirmDeleteOpen(false);
     setExportedJSONPreview('');
     setSetbackResultMessage(null);
-    setSessionKeepPhotosRevealed(false);
-    setRevealedDirectImageIds({});
+    setTestNotificationBanner(null);
     setActiveScreen('onboarding');
     showTemporaryStatus('All local data has been permanently deleted from this device.');
   };
@@ -443,308 +553,368 @@ export default function App() {
     return { monthLabel, cells };
   }, [todayISO, calendarMonthOffset, userState.calendarLogs]);
 
-  // Shared Renderer for the Real Photo / Educational Card (used on both Today & Image Journey!)
-  const renderRealityCheckVisualCard = (isCompactToday = false) => {
-    if (!currentImageCard) return null;
-
-    const isDirectPhotoLocked =
-      currentImageCard.requiresExplicitWarningGate &&
-      !sessionKeepPhotosRevealed &&
-      !revealedDirectImageIds[currentImageCard.id];
-
+  // Shared Personalized Reminders Control Panel (rendered in Photo Mode & Settings)
+  const renderPersonalizedRemindersPanel = () => {
+    const rem = userState.reminderSettings || createDefaultUserState().reminderSettings;
     return (
-      <div className="card card-shock" aria-labelledby="daily-shock-heading">
-        {/* Top Row: Organ Tag + Counter + Next / Skip Buttons */}
+      <section className="card" aria-labelledby="reminders-heading">
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             flexWrap: 'wrap',
-            gap: '0.6rem',
+            gap: '0.75rem',
             marginBottom: '0.75rem'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
-            <span className="pill-badge warning-pill">
-              <Flame size={13} /> {currentImageCard.organTag || 'DAILY REALITY CHECK'}
-            </span>
-            <span className="pill-badge" aria-live="polite">
-              Card {safeImageIndex + 1} of {filteredImages.length}
-            </span>
-            <span className="pill-badge price-pill">
-              {currentImageCard.visualCategoryBadge}
-            </span>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => handleNextImage(true)}
-              aria-label="Skip this image immediately"
-            >
-              <SkipForward size={18} /> Skip
-            </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => handleNextImage(false)}
-            >
-              Next Reality-Check Pic →
-            </button>
-          </div>
-        </div>
-
-        {/* Organ Quick-Jump Selector Bar */}
-        <div className="organ-filter-row" role="group" aria-label="Jump to specific organ pathology photo">
-          {ORGAN_SHORTCUTS.map((org) => {
-            const active = currentImageCard.id === org.id;
-            return (
-              <button
-                key={org.id}
-                type="button"
-                className={`organ-chip ${active ? 'active' : ''}`}
-                onClick={() => handleSelectOrganCard(org.id)}
-              >
-                {org.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Mode Notice if User is in Gentle / Hide Graphic Mode */}
-        {userState.visualIntensity !== 'direct' && (
-          <div
-            className="card card-warning"
-            style={{
-              marginBottom: '0.85rem',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '0.6rem'
-            }}
-          >
-            <span>
-              <strong>Want to see the real-life medical photos of Lungs, Lips, Gums &amp; Throat?</strong>{' '}
-              You are currently in <strong>{userState.visualIntensity}</strong> mode.
-            </span>
-            <button
-              type="button"
-              className="btn btn-danger"
-              onClick={() => {
-                setUserState((prev) => ({ ...prev, visualIntensity: 'direct' }));
-                setCurrentImageIndex(0);
-              }}
-            >
-              <Eye size={18} /> Switch to Direct Mode (Show Real Medical Photos)
-            </button>
-          </div>
-        )}
-
-        {/* Catchy Headline & Card Title */}
-        {currentImageCard.catchyHook && (
-          <div
-            style={{
-              fontSize: '0.92rem',
-              fontWeight: 800,
-              color: '#9B2C2C',
-              textTransform: 'uppercase',
-              letterSpacing: '0.02em',
-              marginBottom: '0.2rem'
-            }}
-          >
-            ⚡ WAKE-UP CALL: {currentImageCard.catchyHook}
-          </div>
-        )}
-        <h3 id="daily-shock-heading" className="section-title" style={{ marginTop: 0 }}>
-          {currentImageCard.title}
-        </h3>
-
-        {/* Advance Content Warning Gate OR Revealed Real Clinical Photo / Diagram */}
-        {isDirectPhotoLocked ? (
-          <div
-            className="card card-warning"
-            role="region"
-            aria-label="Advance Content Warning for Real Clinical Pathology Photo"
-            style={{ margin: '0.85rem 0' }}
-          >
-            <h4 style={{ margin: '0 0 0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <ShieldAlert size={20} /> Graphic Medical Photo Warning (You Are in Control)
-            </h4>
-            <p style={{ margin: '0 0 0.5rem 0' }}>{currentImageCard.contentWarningText}</p>
-            <p style={{ margin: '0 0 0.85rem 0', fontSize: '0.86rem', color: 'var(--text-secondary)' }}>
-              <strong>Screen-Reader / Text Description:</strong>{' '}
-              {currentImageCard.screenReaderDescription}
+          <div>
+            <h3 id="reminders-heading" className="section-title" style={{ margin: 0 }}>
+              <Bell size={20} /> Personalized Photo Mode Reminders (Discreet by Default)
+            </h3>
+            <p className="section-subtitle" style={{ margin: '0.2rem 0 0 0' }}>
+              Opt in to gentle reminders for Photo Mode. Lock-screen notifications are discreet by
+              default—never showing graphic images or sensitive health details unless you explicitly
+              enable and confirm lock-screen images.
             </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() =>
-                  setRevealedDirectImageIds((prev) => ({
-                    ...prev,
-                    [currentImageCard.id]: true
-                  }))
-                }
-              >
-                <Eye size={18} /> Show This Real Medical Photo
-              </button>
+          </div>
+
+          {/* Easy Controls to Turn On, Pause, or Turn Off Reminders */}
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {!rem.enabled ? (
               <button
                 type="button"
                 className="btn btn-primary"
                 onClick={() => {
-                  setSessionKeepPhotosRevealed(true);
-                  setRevealedDirectImageIds((prev) => ({
-                    ...prev,
-                    [currentImageCard.id]: true
-                  }));
+                  setUserState((prev) =>
+                    updateReminderSettings(prev, { enabled: true, paused: false })
+                  );
+                  showTemporaryStatus('Opted in to Personalized Photo Mode Reminders.');
                 }}
               >
-                <Unlock size={18} /> Reveal All Real Medical Photos (Stop Blurring This Session)
+                <Bell size={18} /> Opt In to Reminders
               </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => handleNextImage(true)}
-              >
-                <SkipForward size={18} /> Skip Photo
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() =>
-                  setUserState((prev) => ({ ...prev, visualIntensity: 'hide_graphic' }))
-                }
-              >
-                <EyeOff size={18} /> Hide Graphic Images
-              </button>
-            </div>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const nextPaused = !rem.paused;
+                    setUserState((prev) =>
+                      updateReminderSettings(prev, { paused: nextPaused })
+                    );
+                    showTemporaryStatus(
+                      nextPaused
+                        ? 'Reminders paused. Resume whenever you are ready.'
+                        : 'Reminders resumed.'
+                    );
+                  }}
+                >
+                  <PauseCircle size={18} />
+                  {rem.paused ? 'Resume Reminders' : 'Pause Reminders'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    setUserState((prev) =>
+                      updateReminderSettings(prev, {
+                        enabled: false,
+                        paused: false,
+                        enableImageInNotification: false,
+                        lockScreenImageConfirmed: false
+                      })
+                    );
+                    showTemporaryStatus('Turned off Photo Mode reminders.');
+                  }}
+                >
+                  <BellOff size={18} /> Turn Off Reminders
+                </button>
+              </>
+            )}
           </div>
-        ) : currentImageCard.photoUrl ? (
-          <div className="pathology-photo-frame">
-            <img
-              src={currentImageCard.photoUrl}
-              alt={currentImageCard.screenReaderDescription}
-              className="pathology-photo-img"
-            />
-            <div
-              style={{
-                width: '100%',
-                padding: '0.6rem 0.9rem',
-                background: '#162225',
-                color: '#E6F4F1',
-                fontSize: '0.84rem',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '0.5rem'
-              }}
-            >
-              <span>
-                <strong>Real Clinical Photo:</strong> {currentImageCard.caption}
-              </span>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                style={{ minHeight: '34px', padding: '0.2rem 0.65rem', fontSize: '0.78rem' }}
-                onClick={() => {
-                  setSessionKeepPhotosRevealed(false);
-                  setRevealedDirectImageIds((prev) => ({
-                    ...prev,
-                    [currentImageCard.id]: false
-                  }));
-                }}
-              >
-                <EyeOff size={14} /> Re-Blur Photo
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <EducationalIllustration
-              type={currentImageCard.illustrationType || 'cilia-renewal'}
-              title={currentImageCard.title}
-              description={currentImageCard.screenReaderDescription}
-              reducedMotion={userState.reducedMotion}
-            />
-            <p style={{ fontSize: '0.86rem', color: 'var(--text-secondary)', margin: '0.25rem 0 0.75rem 0' }}>
-              <strong>Caption:</strong> {currentImageCard.caption}
-            </p>
-          </>
-        )}
+        </div>
 
-        {/* Educational Explanation + Takeaway */}
-        <p style={{ margin: '0.5rem 0 0.75rem 0', fontSize: '0.98rem' }}>
-          {currentImageCard.educationalMessage}
-        </p>
-
-        {currentImageCard.encouragingTakeaway && (
+        {/* Live Lock-Screen Discreet Preview */}
+        <div
+          className="card"
+          style={{
+            background: 'var(--bg-elevated)',
+            borderColor: 'var(--brand-primary)',
+            marginBottom: '1rem'
+          }}
+          role="region"
+          aria-label="Lock Screen Notification Preview"
+        >
           <div
-            className="card"
             style={{
-              background: 'var(--status-success-bg)',
-              color: 'var(--status-success-text)',
-              padding: '0.85rem 1rem',
-              marginBottom: '0.75rem'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '0.5rem',
+              marginBottom: '0.4rem'
             }}
           >
-            <strong>Why Quitting Today Saves You:</strong> {currentImageCard.encouragingTakeaway}
+            <span className="pill-badge price-pill">
+              <Lock size={13} />{' '}
+              {reminderPayload.discreetLockScreenDefault
+                ? 'Discreet Lock-Screen Mode Active (No Graphic Images Shown)'
+                : 'Opt-In Lock-Screen Image Enabled (Confirmed by User)'}
+            </span>
+            <span className="pill-badge">
+              Status:{' '}
+              {!rem.enabled ? 'Off' : rem.paused ? 'Paused' : `Active (${reminderPayload.scheduleSummary})`}
+            </span>
           </div>
-        )}
-
-        {/* Official Surgeon General / WHO Warning Banner */}
-        <div className="surgeon-warning-box" role="note" aria-label="Official Tobacco Health Warning">
-          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#FEB2B2', letterSpacing: '0.04em' }}>
-            ⚠️ {currentOfficialWarning.badge}
-          </div>
-          <div style={{ fontWeight: 800, fontSize: '0.98rem', margin: '0.15rem 0' }}>
-            {currentOfficialWarning.headline}
-          </div>
-          <div style={{ fontSize: '0.84rem', color: '#E2E8F0' }}>{currentOfficialWarning.detail}</div>
-        </div>
-
-        {/* Compact Attribution Footer */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
-            fontSize: '0.8rem',
-            color: 'var(--text-muted)',
-            marginTop: '0.5rem'
-          }}
-        >
-          <span>
-            <strong>Verified Legal Source:</strong> {currentImageCard.licenseRecord?.requiredAttribution} (
-            {currentImageCard.licenseRecord?.licenseStatus})
-          </span>
-          {isCompactToday ? (
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ minHeight: '36px', padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-              onClick={() => setActiveScreen('images')}
-            >
-              Open Full 12-Card Photo Deck &amp; License Ledger →
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ minHeight: '36px', padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-              onClick={() => setShowLicenseLedgerModal((prev) => !prev)}
-            >
-              <FileCheck2 size={14} />{' '}
-              {showLicenseLedgerModal ? 'Hide Full License Ledger' : 'Inspect Full Legal License Ledger'}
-            </button>
+          <div style={{ fontWeight: 800, fontSize: '0.96rem' }}>{reminderPayload.title}</div>
+          <div style={{ fontSize: '0.95rem', marginTop: '0.2rem' }}>“{reminderPayload.body}”</div>
+          {reminderPayload.showsImageOnLockScreen && (
+            <div style={{ marginTop: '0.5rem', fontSize: '0.82rem', color: '#9B2C2C', fontWeight: 700 }}>
+              [Opt-In Image Preview Attached on Lock Screen]
+            </div>
           )}
         </div>
-      </div>
+
+        {rem.enabled && (
+          <div className="grid-2">
+            {/* Days & Frequency */}
+            <div>
+              <div className="form-group">
+                <label htmlFor="rem-frequency-select" className="form-label">
+                  Reminder Frequency
+                </label>
+                <select
+                  id="rem-frequency-select"
+                  className="form-input"
+                  value={rem.frequency}
+                  onChange={(e) => {
+                    const freq = e.target.value;
+                    const nextTimes =
+                      freq === 'twice_daily' && (rem.timesOfDay || []).length < 2
+                        ? ['09:00', '19:00']
+                        : rem.timesOfDay;
+                    setUserState((prev) =>
+                      updateReminderSettings(prev, { frequency: freq, timesOfDay: nextTimes })
+                    );
+                  }}
+                >
+                  {REMINDER_FREQUENCY_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <span className="form-label">Days of the Week</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  {REMINDER_DAYS_OF_WEEK.map((day) => {
+                    const selected = (rem.daysOfWeek || []).includes(day.id);
+                    return (
+                      <button
+                        key={day.id}
+                        type="button"
+                        className={`organ-chip ${selected ? 'active' : ''}`}
+                        style={
+                          selected
+                            ? { background: 'var(--brand-primary)', borderColor: 'var(--brand-primary)' }
+                            : {}
+                        }
+                        onClick={() => {
+                          const exists = (rem.daysOfWeek || []).includes(day.id);
+                          const nextDays = exists
+                            ? rem.daysOfWeek.filter((d) => d !== day.id)
+                            : [...(rem.daysOfWeek || []), day.id];
+                          setUserState((prev) =>
+                            updateReminderSettings(prev, { daysOfWeek: nextDays })
+                          );
+                        }}
+                        aria-pressed={selected}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="form-group">
+                <span className="form-label">Reminder Times</span>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.45rem', marginBottom: '0.5rem' }}>
+                  {(rem.timesOfDay || ['09:00']).map((t) => (
+                    <span key={t} className="pill-badge">
+                      <Clock size={13} /> {t}
+                      {(rem.timesOfDay || []).length > 1 && (
+                        <button
+                          type="button"
+                          style={{
+                            border: 'none',
+                            background: 'transparent',
+                            cursor: 'pointer',
+                            fontWeight: 800,
+                            marginLeft: '4px',
+                            color: 'inherit'
+                          }}
+                          onClick={() =>
+                            setUserState((prev) =>
+                              updateReminderSettings(prev, {
+                                timesOfDay: rem.timesOfDay.filter((x) => x !== t)
+                              })
+                            )
+                          }
+                          aria-label={`Remove reminder time ${t}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={newReminderTimeInput}
+                    onChange={(e) => setNewReminderTimeInput(e.target.value)}
+                    aria-label="New reminder time"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      if (!newReminderTimeInput) return;
+                      const nextTimes = Array.from(
+                        new Set([...(rem.timesOfDay || []), newReminderTimeInput])
+                      ).sort();
+                      setUserState((prev) =>
+                        updateReminderSettings(prev, { timesOfDay: nextTimes })
+                      );
+                    }}
+                  >
+                    + Add Time
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress & Lock-Screen Privacy Controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.55rem',
+                  cursor: 'pointer',
+                  fontWeight: 700
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={Boolean(rem.includeQuitProgress)}
+                  onChange={(e) =>
+                    setUserState((prev) =>
+                      updateReminderSettings(prev, { includeQuitProgress: e.target.checked })
+                    )
+                  }
+                />
+                <span>
+                  Include My Accurate, Nonjudgmental Quit Progress
+                  <span className="form-hint" style={{ display: 'block', fontWeight: 400 }}>
+                    Includes saved smoke-free days without guilt-based wording or implying a setback
+                    erases past progress.
+                  </span>
+                </span>
+              </label>
+
+              <div className="card card-warning" style={{ padding: '0.9rem' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: '0.55rem',
+                    cursor: 'pointer',
+                    fontWeight: 700
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={Boolean(rem.enableImageInNotification)}
+                    onChange={(e) =>
+                      setUserState((prev) =>
+                        updateReminderSettings(prev, {
+                          enableImageInNotification: e.target.checked,
+                          lockScreenImageConfirmed: false
+                        })
+                      )
+                    }
+                  />
+                  <span>
+                    Allow an Image in Notifications (Off by Default)
+                    <span className="form-hint" style={{ display: 'block', fontWeight: 400 }}>
+                      By default, notifications are text-only and discreet.
+                    </span>
+                  </span>
+                </label>
+
+                {rem.enableImageInNotification && (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '0.55rem',
+                      cursor: 'pointer',
+                      marginTop: '0.65rem',
+                      paddingTop: '0.65rem',
+                      borderTop: '1px solid var(--border-color)',
+                      fontWeight: 700,
+                      color: '#9B2C2C'
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={Boolean(rem.lockScreenImageConfirmed)}
+                      onChange={(e) =>
+                        setUserState((prev) =>
+                          updateReminderSettings(prev, {
+                            lockScreenImageConfirmed: e.target.checked
+                          })
+                        )
+                      }
+                    />
+                    <span>
+                      Required Lock-Screen Confirmation: I understand that enabling notification
+                      images means an image may be visible on my device’s lock screen.
+                    </span>
+                  </label>
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setTestNotificationBanner(reminderPayload);
+                  showTemporaryStatus('Previewed your Personalized Reminder below.');
+                }}
+              >
+                <Bell size={18} /> Test My Reminder Notification Now
+              </button>
+
+              {testNotificationBanner && (
+                <div className="card" role="status">
+                  <strong>Simulated Device Notification:</strong>
+                  <p style={{ margin: '0.25rem 0 0 0' }}>
+                    <strong>{testNotificationBanner.title}:</strong> {testNotificationBanner.body}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
     );
   };
 
@@ -773,21 +943,25 @@ export default function App() {
               type="button"
               className="brand-logo"
               onClick={() => setActiveScreen('today')}
-              title="Go to Today & Daily Shock"
-              aria-label="Go to Today & Daily Shock"
+              title="Go to Today Dashboard"
+              aria-label="Go to Today Dashboard"
             >
               <Leaf size={22} />
             </button>
             <div className="brand-titles">
-              <h1>CigFree™ — Daily Reality Check</h1>
+              <h1>CigFree™ — Clear Path</h1>
               <p className="brand-subtitle">
-                Working Title: Clear Path • By <strong>{LEGAL_AND_PRICING_CONFIG.companyName}</strong>
+                By <strong>{LEGAL_AND_PRICING_CONFIG.companyName}</strong> • Signature Photo Mode &amp; Quit
+                Companion
               </p>
             </div>
           </div>
 
           <div className="header-pills">
-            <span className="pill-badge price-pill" title="One-Time App Store Download — No Subscriptions">
+            <span
+              className="pill-badge price-pill"
+              title="One-Time App Store Download — No Subscriptions"
+            >
               <Lock size={13} aria-hidden="true" />
               {LEGAL_AND_PRICING_CONFIG.pricing.displayPrice} One-Time • No Subscriptions
             </span>
@@ -819,7 +993,13 @@ export default function App() {
                 key={tab.id}
                 type="button"
                 className={`top-nav-btn ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveScreen(tab.id)}
+                onClick={() => {
+                  if (tab.id === 'images') {
+                    handleOpenPhotoMode();
+                  } else {
+                    setActiveScreen(tab.id);
+                  }
+                }}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <IconComponent size={16} aria-hidden="true" />
@@ -840,16 +1020,18 @@ export default function App() {
               className="btn btn-primary"
               onClick={() => setActiveScreen('today')}
             >
-              <ArrowLeft size={18} /> ← Back to Today &amp; Daily Reality Check
+              <ArrowLeft size={18} /> ← Back to Today Dashboard
             </button>
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => setActiveScreen('images')}
-              >
-                <ImageIcon size={18} /> Real Photo Deck (Lungs, Throat, Lips, Gums)
-              </button>
+              {activeScreen !== 'images' && (
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleOpenPhotoMode}
+                >
+                  <ImageIcon size={18} /> Open Signature Photo Mode
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -897,12 +1079,12 @@ export default function App() {
             </div>
 
             <h2 id="onboarding-heading" className="section-title">
-              <Compass size={24} /> Quick 30-Second Setup — CigFree™ (Clear Path)
+              <Compass size={24} /> Welcome &amp; Quick Setup — CigFree™ (Clear Path)
             </h2>
             <p className="section-subtitle">
-              Configure your quit date and choose whether you want <strong>Real Clinical Pathology Photos</strong>{' '}
-              (lungs, throat, lips, gums, tongue &amp; arteries) on your daily dashboard to scare cravings away,
-              mixed with educational facts and milestone celebrations.
+              Set your quit date, choose your image intensity (**Direct**, **Gentle**, or **No graphic
+              images**), and configure your **Signature Photo Mode** session length (**3 or 5 images per
+              round**).
             </p>
 
             {/* Non-Medical, Trademark & Store Pricing Disclosure Box */}
@@ -956,23 +1138,22 @@ export default function App() {
               {/* 2. Visual Intensity Choice */}
               <div className="form-group">
                 <span className="form-label">
-                  2. Choose Your Visual Reality Mode (Changeable in 1 Click Anytime)
+                  2. Choose Your Visual Intensity (“Direct,” “Gentle,” or “No graphic images”)
                 </span>
                 <span className="form-hint">
-                  Graphic medical images can be upsetting. Even in Direct Mode, you get a content warning
-                  and an always-visible Skip button.
+                  Graphic images can be upsetting. Photo Mode always shows a content warning before your
+                  first session and whenever you change intensity, and lets you skip or exit at any time.
                 </span>
                 <div className="grid-3" style={{ marginTop: '0.5rem' }}>
                   {VISUAL_INTENSITY_OPTIONS.map((opt) => {
-                    const selected = userState.visualIntensity === opt.id;
+                    const selected =
+                      normalizeVisualIntensity(userState.visualIntensity) === opt.id;
                     return (
                       <button
                         key={opt.id}
                         type="button"
                         className={`option-card ${selected ? 'selected' : ''}`}
-                        onClick={() =>
-                          setUserState((prev) => ({ ...prev, visualIntensity: opt.id }))
-                        }
+                        onClick={() => handleIntensityChangeEverywhere(opt.id)}
                         aria-pressed={selected}
                       >
                         <div
@@ -995,7 +1176,30 @@ export default function App() {
                 </div>
               </div>
 
-              {/* 3. Optional Estimates */}
+              {/* 3. Photo Mode Round Length (3 or 5) */}
+              <div className="form-group">
+                <span className="form-label">
+                  3. Signature Photo Mode Session Length (3 or 5 Difficult Images per Round)
+                </span>
+                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginTop: '0.35rem' }}>
+                  {[3, 5].map((len) => {
+                    const active = (userState.photoModeConfig?.roundLength || 3) === len;
+                    return (
+                      <button
+                        key={len}
+                        type="button"
+                        className={`btn ${active ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => handlePhotoModeRoundLengthChange(len)}
+                        aria-pressed={active}
+                      >
+                        {len} Images per Round {active ? '✓' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. Optional Estimates */}
               <div className="card" style={{ marginBottom: '1.25rem' }}>
                 <div
                   style={{
@@ -1008,11 +1212,10 @@ export default function App() {
                 >
                   <div>
                     <h3 style={{ margin: 0, fontSize: '1rem' }}>
-                      3. Optional Cigarette &amp; Cash Savings Tracker
+                      4. Optional Cigarette &amp; Cash Savings Tracker
                     </h3>
                     <p className="form-hint" style={{ margin: '0.2rem 0 0 0' }}>
-                      Optional: Enter how many cigarettes you smoked per day and pack cost to watch your
-                      savings stack up.
+                      Optional: Enter how many cigarettes you smoked per day and pack cost.
                     </p>
                   </div>
                   <label
@@ -1118,9 +1321,9 @@ export default function App() {
                 )}
               </div>
 
-              {/* 4. Motivations */}
+              {/* 5. Motivations */}
               <div className="form-group">
-                <span className="form-label">4. Why Are You Quitting? (Tap Any)</span>
+                <span className="form-label">5. Why Are You Quitting? (Tap Any)</span>
                 <div className="grid-3" style={{ marginTop: '0.4rem' }}>
                   {MOTIVATION_REASONS.map((reason) => {
                     const active = (userState.selectedMotivations || []).includes(reason.id);
@@ -1147,7 +1350,17 @@ export default function App() {
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
                 <button type="submit" className="btn btn-primary">
-                  <CheckCircle2 size={20} /> Finish Setup &amp; Open My Daily Reality Check →
+                  <CheckCircle2 size={20} /> Save Setup &amp; Open Today Dashboard →
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setUserState((prev) => ({ ...prev, onboardingCompleted: true }));
+                    handleOpenPhotoMode();
+                  }}
+                >
+                  <ImageIcon size={20} /> Launch Signature Photo Mode Now →
                 </button>
               </div>
             </form>
@@ -1155,14 +1368,76 @@ export default function App() {
         )}
 
         {/* =====================================================================
-            SCREEN 2: TODAY & DAILY REALITY CHECK (MAIN HOME SCREEN)
+            SCREEN 2: TODAY DASHBOARD (WITH SIGNATURE PHOTO MODE LAUNCHER)
            ===================================================================== */}
         {activeScreen === 'today' && (
           <>
-            {/* 1. DAILY REALITY CHECK ("GROSS PIC + EDUCATIONAL INFO + WARNINGS") RIGHT AT THE TOP! */}
-            {renderRealityCheckVisualCard(true)}
+            {/* Signature Feature Highlight Card on Today Screen */}
+            <section className="card card-shock" aria-labelledby="today-photomode-cta-heading">
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem'
+                }}
+              >
+                <div>
+                  <span className="pill-badge warning-pill">
+                    ★ SIGNATURE FEATURE • PHOTO MODE
+                  </span>
+                  <h2
+                    id="today-photomode-cta-heading"
+                    className="section-title"
+                    style={{ marginTop: '0.45rem' }}
+                  >
+                    Guided Photo Mode: Reality Check, Calm &amp; Your Reason to Quit
+                  </h2>
+                  <p className="section-subtitle" style={{ marginBottom: '0.5rem' }}>
+                    Walk through a controlled round of <strong>3 or 5 difficult images</strong> (real
+                    cleared pathology of lungs, throat, lips, gums &amp; arteries, or gentle diagrams),
+                    followed by a <strong>calming encouragement card</strong> and your{' '}
+                    <strong>personal reason to quit</strong>. Never autoplays—you are always in control.
+                  </p>
+                </div>
 
-            {/* 2. DAILY CHECK-IN & CRAVING BUSTER */}
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-danger"
+                    onClick={handleOpenPhotoMode}
+                  >
+                    <PlayCircle size={20} /> Start Photo Mode Session (
+                    {userState.photoModeConfig?.roundLength || 3} Images / Round) →
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Organ Jump Chips right on Today */}
+              <div style={{ marginTop: '0.75rem' }}>
+                <span className="form-hint" style={{ display: 'block', marginBottom: '0.35rem' }}>
+                  Or jump directly to a specific organ in Photo Mode:
+                </span>
+                <div className="organ-filter-row" style={{ marginBottom: 0 }}>
+                  {ORGAN_SHORTCUTS.map((org) => (
+                    <button
+                      key={org.id}
+                      type="button"
+                      className="organ-chip"
+                      onClick={() => {
+                        handleJumpToOrganInPhotoMode(org.id);
+                        setActiveScreen('images');
+                      }}
+                    >
+                      {org.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            {/* MAIN ACTION ON TODAY SCREEN — DAILY SMOKE-FREE CHECK-IN */}
             <section className="card card-hero" aria-labelledby="today-hero-heading">
               <div
                 style={{
@@ -1182,11 +1457,17 @@ export default function App() {
                         }`
                       : `${progress.effectiveSmokeFreeDays} Smoke-Free Day${
                           progress.effectiveSmokeFreeDays === 1 ? '' : 's'
-                        } Locked In!`}
+                        } Saved!`}
                   </h2>
                   <p className="section-subtitle" style={{ marginBottom: 0 }}>
-                    Quit Date: <strong>{progress.quitDateISO}</strong> • Every smoke-free day you log stays
-                    saved forever.
+                    Quit Date: <strong>{progress.quitDateISO}</strong> • Visual Intensity:{' '}
+                    <strong>
+                      {
+                        VISUAL_INTENSITY_OPTIONS.find(
+                          (o) => o.id === normalizeVisualIntensity(userState.visualIntensity)
+                        )?.label
+                      }
+                    </strong>
                   </p>
                 </div>
 
@@ -1199,7 +1480,7 @@ export default function App() {
                   >
                     <CheckCircle2 size={20} />
                     {progress.isTodayMarkedSmokeFree
-                      ? 'Today Marked CigFree ✓'
+                      ? 'Today Marked Smoke-Free ✓'
                       : '✓ Mark Today Smoke-Free!'}
                   </button>
                   <button
@@ -1239,7 +1520,7 @@ export default function App() {
                     Slipping Up Doesn’t Erase Your Past Smoke-Free Days
                   </h3>
                   <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.92rem' }}>
-                    Don’t let one cigarette trick you into buying a whole pack. CigFree™{' '}
+                    Don’t let one cigarette trick you into giving up. CigFree™{' '}
                     <strong>never erases</strong> the smoke-free days or milestones you already earned.
                   </p>
                   <div className="form-group">
@@ -1250,7 +1531,7 @@ export default function App() {
                       id="setback-note-input"
                       type="text"
                       className="form-input"
-                      placeholder="e.g., After-dinner stress (stored 100% locally)"
+                      placeholder="e.g., Stressful afternoon (stored 100% locally)"
                       value={setbackNote}
                       onChange={(e) => setSetbackNote(e.target.value)}
                     />
@@ -1292,7 +1573,7 @@ export default function App() {
               )}
             </section>
 
-            {/* 3. SCOREBOARD & OPTIONAL SAVINGS ESTIMATES */}
+            {/* SCOREBOARD & OPTIONAL SAVINGS ESTIMATES */}
             <section className="card" aria-labelledby="progress-stats-heading">
               <div
                 style={{
@@ -1305,7 +1586,7 @@ export default function App() {
                 }}
               >
                 <h3 id="progress-stats-heading" className="section-title" style={{ margin: 0 }}>
-                  Your CigFree™ Scoreboard &amp; Optional Estimates
+                  Your Scoreboard &amp; Optional Estimates
                 </h3>
                 <button
                   type="button"
@@ -1353,7 +1634,7 @@ export default function App() {
                   </span>
                   <span className="form-hint">
                     {estimates.hasCigaretteEstimate
-                      ? `Approx. ${estimates.estimatedPacksNotSmoked} packs kept out of your lungs`
+                      ? `Approx. ${estimates.estimatedPacksNotSmoked} packs avoided`
                       : 'Turn on optional estimates in Quick Setup or Settings'}
                   </span>
                 </div>
@@ -1385,10 +1666,10 @@ export default function App() {
               )}
             </section>
 
-            {/* 4. QUICK NAVIGATION & CRAVING SUPPORT ON TODAY */}
+            {/* CRAVING RESCUE & QUICK LINKS */}
             <section className="card" aria-labelledby="today-craving-heading">
               <h3 id="today-craving-heading" className="section-title">
-                <Wind size={20} /> Craving Rescue &amp; Quick Links
+                <Wind size={20} /> Craving Rescue &amp; Quick Support
               </h3>
               <p style={{ fontStyle: 'italic', margin: '0 0 0.85rem 0', color: 'var(--text-secondary)' }}>
                 “{DIFFICULT_DAY_AFFIRMATIONS[activeAffirmationIdx % DIFFICULT_DAY_AFFIRMATIONS.length]}”
@@ -1399,7 +1680,7 @@ export default function App() {
                   className="btn btn-secondary"
                   onClick={() => setActiveAffirmationIdx((prev) => prev + 1)}
                 >
-                  <RefreshCw size={16} /> Next Wake-Up Affirmation
+                  <RefreshCw size={16} /> Next Supportive Message
                 </button>
                 <button
                   type="button"
@@ -1421,248 +1702,656 @@ export default function App() {
         )}
 
         {/* =====================================================================
-            SCREEN 3: IMAGE JOURNEY (FULL 12-CARD REAL PHOTO & EDUCATIONAL DECK)
+            SCREEN 3: SIGNATURE FEATURE — PHOTO MODE (REPEATABLE GUIDED SEQUENCE)
            ===================================================================== */}
         {activeScreen === 'images' && (
-          <section className="card" aria-labelledby="image-journey-heading">
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                flexWrap: 'wrap',
-                gap: '0.75rem',
-                marginBottom: '0.75rem'
-              }}
-            >
-              <div>
-                <h2 id="image-journey-heading" className="section-title" style={{ margin: 0 }}>
-                  <ImageIcon size={22} /> Real Medical Pathology &amp; Educational Deck
-                </h2>
-                <p className="section-subtitle" style={{ margin: '0.2rem 0 0 0' }}>
-                  Verified Public Domain (CDC PHIL / NIH / NCI) &amp; Creative Commons clinical photos of
-                  smoker’s lungs, lip cancer, throat cancer, tongue cancer, gums/teeth, and arteries—mixed
-                  with recovery diagrams and inspirational breathers every 3 cards.
-                </p>
-              </div>
-
-              {/* Quick Visual Intensity Switcher */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                <label htmlFor="journey-intensity-select" className="form-label" style={{ margin: 0 }}>
-                  Visual Mode:
-                </label>
-                <select
-                  id="journey-intensity-select"
-                  className="form-input"
-                  style={{ minHeight: '42px', width: 'auto' }}
-                  value={userState.visualIntensity}
-                  onChange={(e) => {
-                    setUserState((prev) => ({ ...prev, visualIntensity: e.target.value }));
-                    setCurrentImageIndex(0);
-                    setActiveInspirationalPause(null);
-                  }}
-                >
-                  {VISUAL_INTENSITY_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label} ({opt.badge})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Optional Inspirational Pause Interlude (Offered every 3 images) */}
-            {activeInspirationalPause ? (
-              <div className="card card-hero" role="region" aria-labelledby="inspirational-pause-heading">
-                <span className="pill-badge price-pill">
-                  Inspirational Breather (After {imagesViewedSessionCount} Cards)
-                </span>
-                <h3
-                  id="inspirational-pause-heading"
-                  className="section-title"
-                  style={{ marginTop: '0.5rem' }}
-                >
-                  <Sparkles size={20} /> {activeInspirationalPause.title}
-                </h3>
-                <p style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--brand-primary)', margin: 0 }}>
-                  {activeInspirationalPause.visualCategoryBadge}
-                </p>
-
-                <EducationalIllustration
-                  type={activeInspirationalPause.illustrationType}
-                  title={activeInspirationalPause.title}
-                  description={activeInspirationalPause.screenReaderDescription}
-                  reducedMotion={userState.reducedMotion}
-                />
-
-                <div className="card" style={{ margin: '0.85rem 0' }}>
-                  <strong>Encouraging Reason to Quit:</strong>
-                  <p style={{ margin: '0.35rem 0 0 0' }}>{activeInspirationalPause.reasonToQuit}</p>
+          <>
+            <section className="card" aria-labelledby="photo-mode-heading">
+              {/* Top Control Header: Title, Round Length (3 or 5), Intensity Selector, Always-Visible Exit */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '0.75rem',
+                  marginBottom: '1rem'
+                }}
+              >
+                <div>
+                  <span className="pill-badge warning-pill">
+                    ★ SIGNATURE FEATURE • PHOTO MODE (NEVER AUTOPLAYS)
+                  </span>
+                  <h2
+                    id="photo-mode-heading"
+                    className="section-title"
+                    style={{ margin: '0.35rem 0 0 0' }}
+                  >
+                    <ImageIcon size={22} /> Guided Photo Mode Sequence
+                  </h2>
                 </div>
 
-                <p style={{ marginBottom: '1rem' }}>{activeInspirationalPause.promptText}</p>
+                {/* Session Length (3 or 5) + Intensity Selector + Always-Visible Exit */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <label htmlFor="pm-round-length" className="form-label" style={{ margin: 0 }}>
+                    Round Length:
+                  </label>
+                  <select
+                    id="pm-round-length"
+                    className="form-input"
+                    style={{ minHeight: '40px', width: 'auto' }}
+                    value={photoSession.roundLength}
+                    onChange={(e) => handlePhotoModeRoundLengthChange(Number(e.target.value))}
+                  >
+                    <option value={3}>3 Images per Round</option>
+                    <option value={5}>5 Images per Round</option>
+                  </select>
 
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => {
-                      setActiveInspirationalPause(null);
-                      setJourneyPaused(false);
-                      setCurrentImageIndex((prev) => (prev + 1) % filteredImages.length);
-                    }}
+                  <label htmlFor="pm-intensity-select" className="form-label" style={{ margin: 0 }}>
+                    Intensity:
+                  </label>
+                  <select
+                    id="pm-intensity-select"
+                    className="form-input"
+                    style={{ minHeight: '40px', width: 'auto' }}
+                    value={normalizeVisualIntensity(userState.visualIntensity)}
+                    onChange={(e) => handleIntensityChangeEverywhere(e.target.value)}
                   >
-                    Continue to Next Image →
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      setJourneyPaused(true);
-                      showTemporaryStatus('Journey paused. Take all the time you need.');
-                    }}
-                  >
-                    <PauseCircle size={18} /> Pause Here
-                  </button>
+                    {VISUAL_INTENSITY_OPTIONS.map((opt) => (
+                      <option key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+
                   <button
                     type="button"
                     className="btn btn-outline"
-                    onClick={() => {
-                      setActiveInspirationalPause(null);
-                      setActiveScreen('today');
-                    }}
+                    onClick={handleExitPhotoMode}
+                    aria-label="Exit Photo Mode immediately"
                   >
-                    Leave to Today Screen
+                    <XCircle size={18} /> Exit Photo Mode
                   </button>
                 </div>
-
-                {journeyPaused && (
-                  <p style={{ marginTop: '0.85rem', fontWeight: 600 }} role="status">
-                    Paused. Whenever you are ready, click “Continue to Next Image” or “Leave to Today Screen.”
-                  </p>
-                )}
               </div>
-            ) : (
-              renderRealityCheckVisualCard(false)
-            )}
 
-            {/* Expandable Image License & Consent Ledger Manager */}
-            {showLicenseLedgerModal && (
-              <div
-                className="card"
-                style={{ marginTop: '1rem' }}
-                role="region"
-                aria-labelledby="license-ledger-heading"
-              >
-                <h3 id="license-ledger-heading" className="section-title">
-                  <FileCheck2 size={20} /> Complete Legal Image License &amp; Attribution Ledger
-                </h3>
-                <p className="section-subtitle">
-                  Every real-life medical photograph in CigFree™ (Clear Path) is sourced from verified U.S.
-                  Federal Government Public Domain archives (CDC PHIL, NIH/NCI) or Creative Commons medical
-                  repositories with complete attribution recorded below.
-                </p>
-
-                <div className="grid-2" style={{ marginBottom: '1rem' }}>
-                  {allImageCards.map((card) => (
-                    <div
-                      key={card.id}
-                      className="card"
-                      style={{ background: 'var(--bg-elevated)', fontSize: '0.82rem' }}
-                    >
-                      <strong>{card.title}</strong>
-                      <div style={{ marginTop: '0.3rem' }}>
-                        <strong>Source:</strong> {card.licenseRecord?.source}
-                      </div>
-                      <div>
-                        <strong>License:</strong> {card.licenseRecord?.licenseStatus}
-                      </div>
-                      <div>
-                        <strong>Consent / Specimen Status:</strong> {card.licenseRecord?.consentStatus}
-                      </div>
-                      <div>
-                        <strong>Attribution:</strong> {card.licenseRecord?.requiredAttribution}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <form
-                  onSubmit={handleAddCustomImageLicense}
-                  className="card"
-                  style={{ background: 'var(--bg-elevated)' }}
+              {/* ===============================================================
+                  SEQUENCE STEP 1: BRIEF CONTENT WARNING (BEFORE FIRST SESSION OR ON INTENSITY CHANGE)
+                 =============================================================== */}
+              {photoSession.step === 'content_warning' && (
+                <div
+                  className="card card-warning"
+                  role="region"
+                  aria-labelledby="pm-warning-gate-title"
                 >
-                  <h4 style={{ margin: '0 0 0.75rem 0' }}>Record an Additional Cleared Visual Asset</h4>
-                  {licenseFormError && (
-                    <p style={{ color: '#9B2C2C', fontWeight: 700 }} role="alert">
-                      {licenseFormError}
-                    </p>
-                  )}
-                  <div className="grid-2">
-                    <div className="form-group">
-                      <label htmlFor="lic-title" className="form-label">
-                        Image Title *
-                      </label>
-                      <input
-                        id="lic-title"
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. Healthy Alveoli Specimen"
-                        value={newLicenseForm.title}
-                        onChange={(e) => setNewLicenseForm((p) => ({ ...p, title: e.target.value }))}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="lic-source" className="form-label">
-                        Documented Source *
-                      </label>
-                      <input
-                        id="lic-source"
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. CDC Public Health Image Library"
-                        value={newLicenseForm.source}
-                        onChange={(e) => setNewLicenseForm((p) => ({ ...p, source: e.target.value }))}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="lic-status" className="form-label">
-                        License / Permission Status *
-                      </label>
-                      <input
-                        id="lic-status"
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. Public Domain / Written License"
-                        value={newLicenseForm.licenseStatus}
-                        onChange={(e) =>
-                          setNewLicenseForm((p) => ({ ...p, licenseStatus: e.target.value }))
-                        }
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor="lic-consent" className="form-label">
-                        Subject Informed Consent Status
-                      </label>
-                      <input
-                        id="lic-consent"
-                        type="text"
-                        className="form-input"
-                        placeholder="e.g. De-identified pathology specimen / Signed release"
-                        value={newLicenseForm.consentStatus}
-                        onChange={(e) =>
-                          setNewLicenseForm((p) => ({ ...p, consentStatus: e.target.value }))
-                        }
-                      />
+                  <span className="pill-badge warning-pill">
+                    Step 1 • Content Notice &amp; Session Setup
+                  </span>
+                  <h3
+                    id="pm-warning-gate-title"
+                    className="section-title"
+                    style={{ marginTop: '0.5rem' }}
+                  >
+                    <ShieldAlert size={22} /> Content Warning Before Starting Photo Mode
+                  </h3>
+                  <p style={{ margin: '0 0 0.75rem 0' }}>
+                    {normalizeVisualIntensity(userState.visualIntensity) === 'direct'
+                      ? 'You have selected "Direct" intensity. This round will display real-life, legally cleared clinical pathology photographs of smoking-related damage (lungs, throat, lips, gums, tongue, and arteries). These images can be upsetting.'
+                      : normalizeVisualIntensity(userState.visualIntensity) === 'gentle'
+                      ? 'You have selected "Gentle" intensity. This round will display non-graphic educational illustrations showing how smoking affects the body and how tissues recover.'
+                      : 'You have selected "No graphic images." All graphic pathology photographs are hidden, and only uplifting educational diagrams will be shown.'}
+                  </p>
+                  <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    <strong>You are always in control:</strong> Photo Mode never autoplays. You advance
+                    one image at a time, and you can <strong>Skip</strong> any image or{' '}
+                    <strong>Exit Photo Mode</strong> at any moment.
+                  </p>
+
+                  {/* Choose 3 or 5 Difficult Images per Round right on the Warning Screen */}
+                  <div className="form-group">
+                    <span className="form-label">
+                      Choose Session Length (3 or 5 Images per Round):
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                      {[3, 5].map((len) => {
+                        const selected = photoSession.roundLength === len;
+                        return (
+                          <button
+                            key={len}
+                            type="button"
+                            className={`btn ${selected ? 'btn-primary' : 'btn-secondary'}`}
+                            onClick={() => handlePhotoModeRoundLengthChange(len)}
+                            aria-pressed={selected}
+                          >
+                            {len} Difficult Images per Round {selected ? '✓' : ''}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
-                  <button type="submit" className="btn btn-primary">
-                    Save License Record to Ledger
-                  </button>
-                </form>
-              </div>
-            )}
-          </section>
+
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleAcknowledgeWarningAndBeginRound}
+                    >
+                      <Eye size={18} /> I Understand — Start Round {photoSession.roundNumber} (
+                      {photoSession.roundLength} Images) →
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => handleIntensityChangeEverywhere('no_graphic')}
+                    >
+                      <EyeOff size={18} /> Switch to “No graphic images”
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={handleExitPhotoMode}
+                    >
+                      Exit to Today
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ===============================================================
+                  SEQUENCE STEP 2 & 3: DIFFICULT IMAGES (1 AT A TIME, PROGRESS INDICATOR, NEXT/SKIP/EXIT)
+                 =============================================================== */}
+              {photoSession.step === 'difficult_image' && currentPhotoCard && (
+                <div className="card card-shock">
+                  {/* Top Progress Indicator Bar + Next / Skip / Exit */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.6rem',
+                      marginBottom: '0.75rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <span className="pill-badge warning-pill" aria-live="polite">
+                        Round {photoSession.roundNumber} • Image {photoSession.imageIndexInRound + 1} of{' '}
+                        {photoSession.roundLength}
+                      </span>
+                      <span className="pill-badge price-pill">
+                        {currentPhotoCard.visualCategoryBadge}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => handleAdvancePhotoStep(true)}
+                        aria-label="Skip this image"
+                      >
+                        <SkipForward size={18} /> Skip
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => handleAdvancePhotoStep(false)}
+                      >
+                        {photoSession.imageIndexInRound + 1 < photoSession.roundLength
+                          ? `Next Image (${photoSession.imageIndexInRound + 2} of ${
+                              photoSession.roundLength
+                            }) →`
+                          : 'Next: Calming Encouragement →'}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={handleExitPhotoMode}
+                      >
+                        Exit
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Visual Step Progress Dots */}
+                  <div
+                    style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.85rem' }}
+                    role="progressbar"
+                    aria-valuemin={1}
+                    aria-valuemax={photoSession.roundLength}
+                    aria-valuenow={photoSession.imageIndexInRound + 1}
+                    aria-label={`Image ${photoSession.imageIndexInRound + 1} of ${photoSession.roundLength} in Round ${photoSession.roundNumber}`}
+                  >
+                    {Array.from({ length: photoSession.roundLength }).map((_, idx) => (
+                      <div
+                        key={idx}
+                        style={{
+                          flex: 1,
+                          height: '8px',
+                          borderRadius: '999px',
+                          background:
+                            idx <= photoSession.imageIndexInRound
+                              ? 'var(--brand-primary)'
+                              : 'var(--border-color)'
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Organ Quick-Jump Chips */}
+                  <div className="organ-filter-row" role="group" aria-label="Jump to organ">
+                    {ORGAN_SHORTCUTS.map((org) => (
+                      <button
+                        key={org.id}
+                        type="button"
+                        className={`organ-chip ${currentPhotoCard.id === org.id ? 'active' : ''}`}
+                        onClick={() => handleJumpToOrganInPhotoMode(org.id)}
+                      >
+                        {org.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {currentPhotoCard.catchyHook && (
+                    <div
+                      style={{
+                        fontSize: '0.9rem',
+                        fontWeight: 800,
+                        color: '#9B2C2C',
+                        textTransform: 'uppercase',
+                        marginBottom: '0.2rem'
+                      }}
+                    >
+                      ⚡ {currentPhotoCard.organTag}: {currentPhotoCard.catchyHook}
+                    </div>
+                  )}
+                  <h3 className="section-title" style={{ marginTop: 0 }}>
+                    {currentPhotoCard.title}
+                  </h3>
+
+                  {/* Display Real Clinical Photo (when in Direct mode) or Labeled Educational Illustration */}
+                  {currentPhotoCard.photoUrl ? (
+                    <div className="pathology-photo-frame">
+                      <img
+                        src={currentPhotoCard.photoUrl}
+                        alt={currentPhotoCard.screenReaderDescription}
+                        className="pathology-photo-img"
+                      />
+                      <div
+                        style={{
+                          width: '100%',
+                          padding: '0.6rem 0.9rem',
+                          background: '#162225',
+                          color: '#E6F4F1',
+                          fontSize: '0.84rem'
+                        }}
+                      >
+                        <strong>Caption &amp; Accessible Description:</strong>{' '}
+                        {currentPhotoCard.caption} ({currentPhotoCard.screenReaderDescription})
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <EducationalIllustration
+                        type={currentPhotoCard.illustrationType || 'cilia-renewal'}
+                        title={currentPhotoCard.title}
+                        description={currentPhotoCard.screenReaderDescription}
+                        reducedMotion={userState.reducedMotion}
+                      />
+                      <p
+                        style={{
+                          fontSize: '0.86rem',
+                          color: 'var(--text-secondary)',
+                          margin: '0.25rem 0 0.75rem 0'
+                        }}
+                      >
+                        <strong>Caption (Educational Illustration — Not a Real Patient Photo):</strong>{' '}
+                        {currentPhotoCard.caption}
+                      </p>
+                    </>
+                  )}
+
+                  <p style={{ margin: '0.5rem 0 0.75rem 0' }}>
+                    {currentPhotoCard.educationalMessage}
+                  </p>
+
+                  {/* Official Surgeon General / WHO Warning Banner */}
+                  <div className="surgeon-warning-box" role="note">
+                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#FEB2B2' }}>
+                      ⚠️ {currentOfficialWarning.badge}
+                    </div>
+                    <div style={{ fontWeight: 800, fontSize: '0.96rem', margin: '0.15rem 0' }}>
+                      {currentOfficialWarning.headline}
+                    </div>
+                    <div style={{ fontSize: '0.84rem', color: '#E2E8F0' }}>
+                      {currentOfficialWarning.detail}
+                    </div>
+                  </div>
+
+                  {/* Documented Image Rights & Attribution Bar */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-muted)',
+                      marginTop: '0.6rem'
+                    }}
+                  >
+                    <span>
+                      <strong>Documented License &amp; Attribution:</strong>{' '}
+                      {currentPhotoCard.licenseRecord?.requiredAttribution} •{' '}
+                      {currentPhotoCard.licenseRecord?.licenseStatus}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      style={{ minHeight: '36px', padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
+                      onClick={() => setShowLicenseLedgerModal((prev) => !prev)}
+                    >
+                      <FileCheck2 size={14} />{' '}
+                      {showLicenseLedgerModal
+                        ? 'Hide Image Rights Ledger'
+                        : 'View / Record Image License Ledger'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ===============================================================
+                  SEQUENCE STEP 4: CALMING, INSPIRATIONAL IMAGE OR SUPPORTIVE QUOTE
+                 =============================================================== */}
+              {photoSession.step === 'calming_encouragement' && (
+                <div
+                  className="card card-hero"
+                  role="region"
+                  aria-labelledby="pm-calming-step-heading"
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}
+                  >
+                    <span className="pill-badge price-pill">
+                      Round {photoSession.roundNumber} Complete ({photoSession.roundLength} of{' '}
+                      {photoSession.roundLength} Images Viewed) • Step 4: Calming Encouragement
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={handleExitPhotoMode}
+                    >
+                      Exit Photo Mode
+                    </button>
+                  </div>
+
+                  <h3
+                    id="pm-calming-step-heading"
+                    className="section-title"
+                    style={{ marginTop: '0.5rem' }}
+                  >
+                    <Sparkles size={22} /> {currentCalmingCard.title}
+                  </h3>
+
+                  <EducationalIllustration
+                    type={currentCalmingCard.illustrationType}
+                    title={currentCalmingCard.title}
+                    description={currentCalmingCard.screenReaderDescription}
+                    reducedMotion={userState.reducedMotion}
+                  />
+
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    <strong>Caption:</strong> {currentCalmingCard.caption}
+                  </p>
+
+                  <blockquote
+                    className="card"
+                    style={{
+                      margin: '0.85rem 0',
+                      fontSize: '1.05rem',
+                      fontWeight: 600,
+                      borderLeft: '4px solid var(--brand-primary)'
+                    }}
+                  >
+                    {currentCalmingCard.supportiveQuote}
+                  </blockquote>
+
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => handleAdvancePhotoStep(false)}
+                    >
+                      Next: See Your Positive Reason to Quit →
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={handleExitPhotoMode}
+                    >
+                      Finish &amp; Return to Today
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ===============================================================
+                  SEQUENCE STEP 5 & 6: POSITIVE REASON TO QUIT + CONTINUE / PAUSE / FINISH
+                 =============================================================== */}
+              {photoSession.step === 'reason_to_quit' && (
+                <div
+                  className="card card-hero"
+                  role="region"
+                  aria-labelledby="pm-reason-step-heading"
+                >
+                  <span className="pill-badge price-pill">
+                    Round {photoSession.roundNumber} • Step 5: Positive Reason to Quit &amp; Next Step
+                  </span>
+                  <h3
+                    id="pm-reason-step-heading"
+                    className="section-title"
+                    style={{ marginTop: '0.5rem' }}
+                  >
+                    <Heart size={22} /> Your Positive Reason to Quit: {currentReasonToQuit.motivationLabel}
+                  </h3>
+                  <p style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 0.85rem 0' }}>
+                    {currentReasonToQuit.motivationDescription}
+                  </p>
+
+                  <div className="card" style={{ marginBottom: '1rem' }}>
+                    <span className="pill-badge price-pill">Medically Reviewed Public-Health Benefit</span>
+                    <h4 style={{ margin: '0.4rem 0 0.25rem 0' }}>
+                      {currentReasonToQuit.benefitTitle}
+                    </h4>
+                    <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.94rem' }}>
+                      {currentReasonToQuit.benefitSummary}
+                    </p>
+                    <span className="form-hint">
+                      Citation: {currentReasonToQuit.benefitCitation}
+                    </span>
+                  </div>
+
+                  {/* Step 6: Choice to Continue With Another Round, Pause, or Finish */}
+                  <p style={{ fontWeight: 700, marginBottom: '0.65rem' }}>
+                    How would you like to proceed?
+                  </p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={handleStartNextRound}
+                    >
+                      <PlayCircle size={18} /> Continue With Another Round (Round{' '}
+                      {photoSession.roundNumber + 1} • {photoSession.roundLength} Images) →
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setPhotoSession((prev) => ({ ...prev, isPaused: !prev.isPaused }));
+                        showTemporaryStatus('Photo Mode session paused. Resume whenever you are ready.');
+                      }}
+                    >
+                      <PauseCircle size={18} />
+                      {photoSession.isPaused ? 'Resume Session' : 'Pause Session'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={handleExitPhotoMode}
+                    >
+                      <CheckCircle2 size={18} /> Finish Session &amp; Return to Today
+                    </button>
+                  </div>
+
+                  {photoSession.isPaused && (
+                    <div className="card" style={{ marginTop: '0.85rem' }} role="status">
+                      <strong>Session Paused:</strong> Take all the time you need. Nothing advances
+                      automatically—click “Continue With Another Round” or “Finish Session” whenever you
+                      are ready.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Expandable Image License & Consent Ledger Manager */}
+              {showLicenseLedgerModal && (
+                <div
+                  className="card"
+                  style={{ marginTop: '1rem' }}
+                  role="region"
+                  aria-labelledby="license-ledger-heading"
+                >
+                  <h3 id="license-ledger-heading" className="section-title">
+                    <FileCheck2 size={20} /> Documented Image Source, License &amp; Consent Ledger
+                  </h3>
+                  <p className="section-subtitle">
+                    Every real-life medical photograph is sourced from verified Public Domain (CDC PHIL,
+                    NIH/NCI) or Creative Commons medical archives with complete attribution recorded below.
+                    Generated or illustrative diagrams are never presented as real patient photographs.
+                  </p>
+
+                  <div className="grid-2" style={{ marginBottom: '1rem' }}>
+                    {allImageCards.map((card) => (
+                      <div
+                        key={card.id}
+                        className="card"
+                        style={{ background: 'var(--bg-elevated)', fontSize: '0.82rem' }}
+                      >
+                        <strong>{card.title}</strong>
+                        <div style={{ marginTop: '0.3rem' }}>
+                          <strong>Source:</strong> {card.licenseRecord?.source}
+                        </div>
+                        <div>
+                          <strong>Creator:</strong> {card.licenseRecord?.creator}
+                        </div>
+                        <div>
+                          <strong>License:</strong> {card.licenseRecord?.licenseStatus}
+                        </div>
+                        <div>
+                          <strong>Consent / Specimen Status:</strong> {card.licenseRecord?.consentStatus}
+                        </div>
+                        <div>
+                          <strong>Permitted Uses:</strong> {card.licenseRecord?.permittedUses}
+                        </div>
+                        <div>
+                          <strong>Attribution:</strong> {card.licenseRecord?.requiredAttribution}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <form
+                    onSubmit={handleAddCustomImageLicense}
+                    className="card"
+                    style={{ background: 'var(--bg-elevated)' }}
+                  >
+                    <h4 style={{ margin: '0 0 0.75rem 0' }}>Record an Additional Cleared Visual Asset</h4>
+                    {licenseFormError && (
+                      <p style={{ color: '#9B2C2C', fontWeight: 700 }} role="alert">
+                        {licenseFormError}
+                      </p>
+                    )}
+                    <div className="grid-2">
+                      <div className="form-group">
+                        <label htmlFor="lic-title" className="form-label">
+                          Image Title *
+                        </label>
+                        <input
+                          id="lic-title"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. Healthy Alveoli Specimen"
+                          value={newLicenseForm.title}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, title: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="lic-source" className="form-label">
+                          Documented Source *
+                        </label>
+                        <input
+                          id="lic-source"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. CDC Public Health Image Library"
+                          value={newLicenseForm.source}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, source: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="lic-status" className="form-label">
+                          License / Permission Status *
+                        </label>
+                        <input
+                          id="lic-status"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. Public Domain / Written License"
+                          value={newLicenseForm.licenseStatus}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, licenseStatus: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="lic-consent" className="form-label">
+                          Subject Informed Consent Status
+                        </label>
+                        <input
+                          id="lic-consent"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. De-identified pathology specimen / Signed release"
+                          value={newLicenseForm.consentStatus}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, consentStatus: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" className="btn btn-primary">
+                      Save License Record to Ledger
+                    </button>
+                  </form>
+                </div>
+              )}
+            </section>
+
+            {/* Personalized Reminders directly below Photo Mode! */}
+            {renderPersonalizedRemindersPanel()}
+          </>
         )}
 
         {/* =====================================================================
@@ -1764,7 +2453,7 @@ export default function App() {
                   type="text"
                   className="form-input"
                   style={{ flex: '1 1 240px' }}
-                  placeholder="Add your own reason (e.g., Never getting throat or lung cancer)"
+                  placeholder="Add your own reason (e.g., Protecting my lungs and voice box)"
                   value={customMotivationInput}
                   onChange={(e) => setCustomMotivationInput(e.target.value)}
                   aria-label="Add a custom personal motivation"
@@ -2136,10 +2825,13 @@ export default function App() {
         )}
 
         {/* =====================================================================
-            SCREEN 7: SETTINGS, ACCESSIBILITY, PRIVACY & LEGAL
+            SCREEN 7: SETTINGS, REMINDERS, ACCESSIBILITY, PRIVACY & LEGAL
            ===================================================================== */}
         {activeScreen === 'settings' && (
           <>
+            {/* Personalized Reminders Section */}
+            {renderPersonalizedRemindersPanel()}
+
             {/* Appearance & Accessibility */}
             <section className="card" aria-labelledby="settings-appearance-heading">
               <h2 id="settings-appearance-heading" className="section-title">
@@ -2187,15 +2879,13 @@ export default function App() {
 
                 <div className="form-group">
                   <label htmlFor="settings-visual-intensity" className="form-label">
-                    Visual Reality Mode (Real Photos vs. Diagrams)
+                    Photo Mode Image Intensity (“Direct,” “Gentle,” or “No graphic images”)
                   </label>
                   <select
                     id="settings-visual-intensity"
                     className="form-input"
-                    value={userState.visualIntensity}
-                    onChange={(e) =>
-                      setUserState((prev) => ({ ...prev, visualIntensity: e.target.value }))
-                    }
+                    value={normalizeVisualIntensity(userState.visualIntensity)}
+                    onChange={(e) => handleIntensityChangeEverywhere(e.target.value)}
                   >
                     {VISUAL_INTENSITY_OPTIONS.map((opt) => (
                       <option key={opt.id} value={opt.id}>
@@ -2472,7 +3162,7 @@ export default function App() {
             <p className="section-subtitle">
               Connect with reputable, evidence-based quit-smoking support organizations. CigFree™ never
               guesses or tracks your location—select your region below, or use the top bar to jump back to
-              your Daily Reality Check at any time.
+              your Today dashboard at any time.
             </p>
 
             <div className="form-group" style={{ maxWidth: '380px' }}>
@@ -2570,7 +3260,13 @@ export default function App() {
                 key={tab.id}
                 type="button"
                 className={`nav-tab ${isActive ? 'active' : ''}`}
-                onClick={() => setActiveScreen(tab.id)}
+                onClick={() => {
+                  if (tab.id === 'images') {
+                    handleOpenPhotoMode();
+                  } else {
+                    setActiveScreen(tab.id);
+                  }
+                }}
                 aria-current={isActive ? 'page' : undefined}
               >
                 <IconComponent size={19} aria-hidden="true" />
