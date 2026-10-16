@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "Clear Path",
+    "slug": "clear-path-cigfree",
+    "owner": "primo72",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "clearpath",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.primoittech.clearpath",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.primoittech.clearpath",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "company": "The Primo IT Tech LLC",
+      "managingMember": "Keith Franklin",
+      "copyright": "© 2026 The Primo IT Tech LLC. All Rights Reserved.",
+      "storePrice": "$0.99 One-Time Download (No Subscriptions, No Surprise IAP)",
+      "feeDisclaimer": "Price is $0.99 USD before applicable store taxes. The Primo IT Tech LLC does not promise a specific net amount after app-store fees or taxes."
+    }
+  }
+}

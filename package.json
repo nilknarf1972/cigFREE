@@ -1,0 +1,24 @@
+{
+  "name": "clear-path-cigfree",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Clear Path (cigFREE) — Supportive cigarette-cessation app for iOS, Android, and Offline Web by The Primo IT Tech LLC. One-time $0.99 download, no subscriptions, 100% local privacy.",
+  "author": "Keith Franklin / The Primo IT Tech LLC",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/clearPathEngine.test.mjs"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.5"
+  }
+}
