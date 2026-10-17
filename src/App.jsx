@@ -145,8 +145,9 @@ export default function App() {
   const [activeAffirmationIdx, setActiveAffirmationIdx] = useState(0);
   const [activeWarningIdx, setActiveWarningIdx] = useState(0);
 
-  // Benefits custom motivation input
+  // Benefits custom motivation input & category filter
   const [customMotivationInput, setCustomMotivationInput] = useState('');
+  const [benefitCategoryFilter, setBenefitCategoryFilter] = useState('All');
 
   // Calendar state
   const [calendarMonthOffset, setCalendarMonthOffset] = useState(0);
@@ -987,7 +988,7 @@ export default function App() {
 
     const controlsBarStyle = {
       position: 'fixed',
-      bottom: '1.5rem',
+      bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
       left: '1.5rem',
       right: '1.5rem',
       display: 'flex',
@@ -1004,6 +1005,7 @@ export default function App() {
           role="dialog"
           aria-modal="true"
           aria-labelledby="pm-fullscreen-warning-title"
+          className="photo-fullscreen-fade"
           style={{
             position: 'fixed',
             inset: 0,
@@ -1122,8 +1124,10 @@ export default function App() {
       const hasRealPhoto = Boolean(currentPhotoCard?.photoUrl && !imageLoadFailed);
       return (
         <div
+          key={`diff-${photoSession.currentDeckIndex}`}
           role="region"
           aria-label="Photo Mode Full-Screen Image Viewer"
+          className="photo-fullscreen-fade"
           style={{
             position: 'fixed',
             inset: 0,
@@ -2163,6 +2167,23 @@ export default function App() {
                 </div>
               </div>
 
+              {!userState.estimateSettings?.enabled && (
+                <div className="empty-state-box" style={{ marginTop: '1rem' }}>
+                  <strong>Want to track cigarettes avoided &amp; cash saved?</strong>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    Optional: Enter your estimated cigarettes per day and pack cost to see your personal
+                    savings grow alongside your smoke-free days.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setActiveScreen('onboarding')}
+                  >
+                    Enable Optional Savings Estimates →
+                  </button>
+                </div>
+              )}
+
               {showFormulaDetails && (
                 <div className="card" style={{ marginTop: '1rem', background: 'var(--bg-elevated)' }}>
                   <strong>Transparent Calculation Formula ({estimates.estimateLabel}):</strong>
@@ -2213,7 +2234,7 @@ export default function App() {
            ===================================================================== */}
         {activeScreen === 'benefits' && (
           <>
-            <section className="card" aria-labelledby="benefits-heading">
+            <section className="card screen-fade" aria-labelledby="benefits-heading">
               <h2 id="benefits-heading" className="section-title">
                 <Heart size={22} /> Quitting Benefits &amp; Trusted Public-Health Sources
               </h2>
@@ -2227,8 +2248,28 @@ export default function App() {
                 {LEGAL_AND_PRICING_CONFIG.medicalDisclaimer.preReleaseAuditBanner}
               </div>
 
+              {/* Easy Category Filter Pills */}
+              <div className="filter-pill-row" role="group" aria-label="Filter benefits by category">
+                {['All', ...Array.from(new Set(BENEFIT_CARDS.map((c) => c.category)))].map((cat) => {
+                  const active = benefitCategoryFilter === cat;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      className={`filter-pill ${active ? 'active' : ''}`}
+                      onClick={() => setBenefitCategoryFilter(cat)}
+                      aria-pressed={active}
+                    >
+                      {cat}
+                    </button>
+                  );
+                })}
+              </div>
+
               <div className="grid-2">
-                {BENEFIT_CARDS.map((card) => (
+                {BENEFIT_CARDS.filter(
+                  (card) => benefitCategoryFilter === 'All' || card.category === benefitCategoryFilter
+                ).map((card) => (
                   <article
                     key={card.id}
                     className="card"
@@ -2286,7 +2327,7 @@ export default function App() {
                 })}
               </div>
 
-              {(userState.customMotivations || []).length > 0 && (
+              {(userState.customMotivations || []).length > 0 ? (
                 <div style={{ marginBottom: '1rem' }}>
                   <strong>Your Custom Motivations:</strong>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
@@ -2296,6 +2337,14 @@ export default function App() {
                       </span>
                     ))}
                   </div>
+                </div>
+              ) : (
+                <div className="empty-state-box" style={{ marginBottom: '1rem' }}>
+                  <strong>No custom personal motivations added yet</strong>
+                  <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
+                    Add your own personal reason below—it will also appear in your full-screen Photo Mode
+                    rounds!
+                  </p>
                 </div>
               )}
 
@@ -2368,7 +2417,23 @@ export default function App() {
            ===================================================================== */}
         {activeScreen === 'calendar' && (
           <>
-            <section className="card" aria-labelledby="calendar-heading">
+            <section className="card screen-fade" aria-labelledby="calendar-heading">
+              {progress.smokeFreeDaysCount === 0 && (
+                <div className="empty-state-box" style={{ marginBottom: '1rem' }}>
+                  <strong>No calendar days marked yet—start with Today!</strong>
+                  <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    Tap the button below to log your first smoke-free day on {todayISO}.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleMarkTodaySmokeFree}
+                  >
+                    <CheckCircle2 size={18} /> Mark Today ({todayISO}) Smoke-Free
+                  </button>
+                </div>
+              )}
+
               <div
                 style={{
                   display: 'flex',
