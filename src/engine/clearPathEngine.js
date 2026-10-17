@@ -753,7 +753,7 @@ export function buildReminderNotificationPayload(
     discreetLockScreenDefault: !showsImageOnLockScreen,
     showsImageOnLockScreen,
     attachedImageUrl: showsImageOnLockScreen
-      ? '/images/pathology/lung-emphysema-cdc.jpg'
+      ? './images/pathology/lung-emphysema-cdc.jpg'
       : null,
     scheduleSummary: `${reminders.frequency === 'twice_daily' ? 'Twice daily' : 'Selected days'} (${(
       reminders.daysOfWeek || []

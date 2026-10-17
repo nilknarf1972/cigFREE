@@ -9,7 +9,7 @@
 
 ## 1. Corporate & Store Listing Compliance
 - **Publisher Name:** The Primo IT Tech LLC
-- **Price Tier:** **$0.99 USD One-Time Download** on Apple App Store (`com.primoittech.clearpath`) and Google Play Store (`com.primoittech.clearpath`).
+- **Price Tier:** **$0.99 USD One-Time Download** on Apple App Store (`com.primoittech.cigfree`) and Google Play Store (`com.primoittech.cigfree`).
 - **Monetization Rules Enforced:**
   - `hasSubscriptions`: `false`
   - `hasInAppPurchases`: `false`
@@ -18,17 +18,19 @@
 
 ---
 
-## 2. Pre-Release Image Clearance & Placeholder Disclosure Audit
+## 2. Pre-Release Image Clearance & Attribution Audit
 In accordance with the product brief:
 > *"Use only images that are legally cleared for this specific use: documented licenses or written, informed permission from the photographer and identifiable people shown. Do not scrape images, assume online availability means permission, or generate fake images presented as real patient photos... Before release, identify any placeholder images or unverified health claims clearly. Do not present placeholders as real patient images or unreviewed claims as medical facts."*
 
-### Current Visual Asset Status in v1.0.0:
-1. **100% Original Non-Graphic & Direct Educational SVG Illustrations**:
-   - All 9 journey visuals and 3 inspirational interlude visuals bundled in v1.0.0 are original vector diagrams created by **The Primo IT Tech LLC** under internal proprietary license (`PRIMO-SVG-2026-CLEARPATH`).
-   - Every visual is explicitly badged in the UI as: **`Educational Illustration — Not a Real Patient Photo`**.
-2. **Real-Life Clinical Photography Placeholder Identification**:
-   - Where future releases may optionally incorporate real-world clinical or photographic imagery (such as direct clinical pathology photography), those slots are explicitly marked in the **Image Rights & Consent Ledger** (`src/data/clearPathData.js`) with `isPlaceholderForRealPhoto: true` and `releaseAuditNote: "Educational vector diagram used in place of clinical photography. Before replacing with any real-world photograph, obtain written photographer license and signed HIPAA/informed subject consent release."`
-   - No scraped, unverified, or AI-generated fake patient photos exist anywhere in this repository.
+### Current Visual Asset Status in v1.1.0:
+1. **8 Legally Cleared Clinical Pathology Photographs (`public/images/pathology/*`)**:
+   - Shown only when the user selects **Direct** visual intensity and explicitly unlocks the per-card **Advance Content Warning** gate (with an always-visible **Skip Image** button).
+   - Sourced from U.S. Federal Government Public Domain archives (CDC Public Health Image Library PHIL #865 & #846, National Cancer Institute / NIH `17 U.S.C. § 105`), Public Domain clinical releases (`DRosenbach`, Wikimedia pathology archive), and open-access medical publications (`PLoS Medicine` CC BY 2.5, Coronation Dental Specialty Group CC BY-SA 4.0, Paweł Kuźniar CC BY-SA 3.0).
+   - **Standalone Media Attribution & ShareAlike Isolation:** Any Creative Commons ShareAlike (`CC BY-SA`) photographs in `public/images/pathology/` are distributed as unmodified standalone media files with full creator and license attribution in the in-app **Image Source, License & Consent Ledger** (`src/data/clearPathData.js`), separate from the proprietary application code (`© 2026 The Primo IT Tech LLC`).
+2. **4 Original Non-Graphic SVG Recovery Illustrations & 3 Calming U.S. National Park Service Photographs (`public/images/calming/*`)**:
+   - Recovery diagrams are original vector illustrations created by **The Primo IT Tech LLC** (`#PRIMO-SVG-001` through `#PRIMO-SVG-009`), explicitly badged as **`Educational Recovery Illustration`**.
+   - Calming breather photographs are U.S. National Park Service Public Domain works (`17 U.S.C. § 105`).
+   - No unverified scraped images or AI-generated fake patient photos exist anywhere in this repository.
 
 ---
 

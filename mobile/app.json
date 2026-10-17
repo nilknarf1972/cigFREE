@@ -10,14 +10,14 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.primoittech.clearpath",
+      "bundleIdentifier": "com.primoittech.cigfree",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.primoittech.clearpath",
+      "package": "com.primoittech.cigfree",
       "versionCode": 1,
       "permissions": []
     },

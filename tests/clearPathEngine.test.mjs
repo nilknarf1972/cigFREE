@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 
 import {
   STORAGE_KEY,
@@ -132,7 +135,7 @@ test('4. Theme switching, visual intensity filtering & real pathology image file
     assert.ok(card.requiresExplicitWarningGate, `${card.id} must require advance warning gate`);
     assert.ok(card.licenseRecord?.source, `${card.id} must have documented source`);
     assert.ok(card.licenseRecord?.licenseStatus, `${card.id} must have documented license status`);
-    const diskPath = path.join('C:\\projects\\cigFREE\\public', card.photoUrl.replace(/\//g, path.sep));
+    const diskPath = path.join(PUBLIC_DIR, card.photoUrl.replace(/\//g, path.sep));
     assert.ok(fs.existsSync(diskPath), `Pathology photo file must exist on disk: ${diskPath}`);
   }
 

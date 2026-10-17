@@ -28,7 +28,7 @@
 - **No Promised Net Proceeds After Store Fees or Taxes**: Applicable sales taxes, VAT/GST, and platform commissions are handled by Apple App Store and Google Play Store at checkout; **The Primo IT Tech LLC** does not promise or represent a specific net amount after app-store fees or taxes.
 - **Educational & Motivational Only (Not Medical Care)**: Clear Path is an educational and motivational tool, not a medical device or clinical service. Always consult a physician, pharmacist, or healthcare professional for medical advice.
 - **Pre-Release Image & Clinical Claim Audit**:
-  - All visuals bundled in v1.0.0 are **original non-photographic SVG educational illustrations** created by **The Primo IT Tech LLC** (`Educational Illustration — Not a Real Patient Photo`). No scraped photos or AI-generated fake patient photos are used.
+  - Includes **8 legally cleared clinical pathology photographs** (U.S. Government Public Domain CDC PHIL / NCI-NIH and attributed Creative Commons medical archives, gated behind an explicit Advance Content Warning and Skip button in **Direct** mode) alongside **4 original non-photographic SVG recovery illustrations** (`© 2026 The Primo IT Tech LLC`) and **3 U.S. National Park Service Public Domain calming photographs**. No scraped unverified photos or AI-generated fake patient photos are used.
   - All time-based health benefit summaries cite public-health authorities and are explicitly flagged in [`LEGAL_AND_COMPLIANCE.md`](./LEGAL_AND_COMPLIANCE.md) for final sign-off by a qualified medical reviewer before clinical claim release.
 
 ---
