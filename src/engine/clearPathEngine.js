@@ -465,7 +465,7 @@ export function selectPositiveReasonToQuit(userState, roundNumber = 1) {
 
   return {
     shortLine,
-    photoUrl: calmingStep?.reasonPhotoUrl || '/images/calming/calm-ocean-nps.jpg',
+    photoUrl: calmingStep?.reasonPhotoUrl || './images/calming/calm-ocean-nps.jpg',
     motivationLabel: customReason || chosenMotivation.label,
     motivationDescription: customReason
       ? `Your personal goal: "${customReason}"`

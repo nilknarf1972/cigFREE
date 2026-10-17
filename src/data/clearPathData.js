@@ -150,7 +150,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Smoker’s Lung: Centrilobular Emphysema & Tar Anthracosis',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/lung-emphysema-cdc.jpg',
+    photoUrl: './images/pathology/lung-emphysema-cdc.jpg',
     contentWarningText:
       'Advance Content Warning: This card shows a real-life clinical pathology photograph (CDC PHIL #865) of a human lung cut open to reveal black smoke pigment (anthracosis) and destroyed emphysema air spaces. You can reveal it or skip it at any time.',
     illustrationType: 'airway-comparison-direct',
@@ -182,7 +182,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Lip Cancer: Squamous Cell Carcinoma of the Lower Lip',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/lip-cancer-clinical.jpg',
+    photoUrl: './images/pathology/lip-cancer-clinical.jpg',
     contentWarningText:
       'Advance Content Warning: This card displays a real-life clinical dental photograph of an ulcerated squamous cell carcinoma tumor on the lower lip. You can reveal or skip this image at any time.',
     illustrationType: 'oral-tissue-direct',
@@ -214,7 +214,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Smoker’s Gums & Teeth: Heavy Tar Calculus & Gum Recession',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/gums-teeth-calculus.jpg',
+    photoUrl: './images/pathology/gums-teeth-calculus.jpg',
     contentWarningText:
       'Advance Content Warning: This card shows a real-life close-up dental photograph of severe brown/black tar-stained calculus buildup and inflamed, receding gums. You may view or skip it at any time.',
     illustrationType: 'oral-tissue-direct',
@@ -276,7 +276,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Throat Cancer: Squamous Cell Carcinoma of the Larynx',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/throat-larynx-cancer.jpg',
+    photoUrl: './images/pathology/throat-larynx-cancer.jpg',
     contentWarningText:
       'Advance Content Warning: This card shows a real surgical pathology specimen of a human larynx (voice box) containing a large squamous cell carcinoma tumor. You can reveal or skip this card at any time.',
     illustrationType: 'airway-comparison-direct',
@@ -308,7 +308,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Oral Cancer: Squamous Cell Carcinoma Inside the Mouth',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/tongue-oral-cancer.png',
+    photoUrl: './images/pathology/tongue-oral-cancer.png',
     contentWarningText:
       'Advance Content Warning: This card shows a real intraoral clinical photograph of an advanced oral squamous cell carcinoma lesion under the tongue (*PLoS Medicine*, CC BY 2.5). You can reveal or skip this image at any time.',
     illustrationType: 'oral-tissue-direct',
@@ -340,7 +340,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Lung Tumor Specimen: Bronchogenic Lung Cancer',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/lung-cancer-specimen.jpg',
+    photoUrl: './images/pathology/lung-cancer-specimen.jpg',
     contentWarningText:
       'Advance Content Warning: This card shows a real gross pathology specimen of a human lung cross-section with a large cancerous tumor mass (Public Domain). You can reveal or skip it at any time.',
     illustrationType: 'airway-comparison-direct',
@@ -402,7 +402,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Precancerous Mouth Lesion: Oral Leukoplakia (NCI)',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/oral-leukoplakia-nci.jpg',
+    photoUrl: './images/pathology/oral-leukoplakia-nci.jpg',
     contentWarningText:
       'Advance Content Warning: This card shows a real clinical photograph from the National Cancer Institute (Public Domain) of thick white precancerous leukoplakia patches on the tongue caused by tobacco irritation.',
     illustrationType: 'oral-tissue-direct',
@@ -434,7 +434,7 @@ export const DEFAULT_IMAGE_JOURNEY_CARDS = [
     title: 'Real Arterial Damage: Severe Aortic Atherosclerosis (CDC)',
     intensity: 'direct',
     requiresAdvanceWarning: true,
-    photoUrl: '/images/pathology/artery-atherosclerosis-cdc.jpg',
+    photoUrl: './images/pathology/artery-atherosclerosis-cdc.jpg',
     contentWarningText:
       'Advance Content Warning: This card displays a real pathology specimen photograph (CDC PHIL #846) of a main human artery opened to show severe atherosclerotic plaque buildup and ulceration.',
     illustrationType: 'arterial-stress-direct',
@@ -861,8 +861,8 @@ export const PHOTO_MODE_CALMING_STEPS = [
   {
     id: 'calm-sunrise-breath',
     title: 'Pause & Exhale — You Are Choosing Health Right Now',
-    photoUrl: '/images/calming/calm-sunrise-nps.jpg',
-    reasonPhotoUrl: '/images/calming/calm-ocean-nps.jpg',
+    photoUrl: './images/calming/calm-sunrise-nps.jpg',
+    reasonPhotoUrl: './images/calming/calm-ocean-nps.jpg',
     illustrationType: 'sunrise-horizon',
     visualCategoryBadge: 'Calming Photograph — U.S. National Park Service (Public Domain)',
     caption: 'Sunrise over Shenandoah National Park (U.S. National Park Service, Public Domain).',
@@ -883,8 +883,8 @@ export const PHOTO_MODE_CALMING_STEPS = [
   {
     id: 'calm-forest-stream',
     title: 'Steady & Strong — One Round, One Day at a Time',
-    photoUrl: '/images/calming/calm-forest-nps.jpg',
-    reasonPhotoUrl: '/images/calming/calm-lake-nps.jpg',
+    photoUrl: './images/calming/calm-forest-nps.jpg',
+    reasonPhotoUrl: './images/calming/calm-lake-nps.jpg',
     illustrationType: 'forest-breeze',
     visualCategoryBadge: 'Calming Photograph — U.S. National Park Service (Public Domain)',
     caption: 'Tall Coast Redwoods in Redwood National Park (U.S. National Park Service, Public Domain).',
@@ -905,8 +905,8 @@ export const PHOTO_MODE_CALMING_STEPS = [
   {
     id: 'calm-harbor-beacon',
     title: 'You Are Stronger Than a 5-Minute Craving',
-    photoUrl: '/images/calming/calm-lake-nps.jpg',
-    reasonPhotoUrl: '/images/calming/calm-sunrise-nps.jpg',
+    photoUrl: './images/calming/calm-lake-nps.jpg',
+    reasonPhotoUrl: './images/calming/calm-sunrise-nps.jpg',
     illustrationType: 'harbor-beacon',
     visualCategoryBadge: 'Calming Photograph — U.S. National Park Service (Public Domain)',
     caption: 'Lake McDonald in Glacier National Park (U.S. National Park Service, Public Domain).',
