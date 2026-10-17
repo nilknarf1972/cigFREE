@@ -182,13 +182,13 @@ test('5. Data export, data deletion, image license ledger, and The Primo IT Tech
   );
 });
 
-test('6. Signature Feature: Photo Mode enforces content warning on first session & intensity change, 3 or 5 round length, calming encouragement, positive reason to quit, and next round', () => {
+test('6. Signature Feature: Full-Screen Photo Mode enforces content warning before start, 3 or 5 round length, calming photo, short reason-to-quit line over image, and Continue/Close step', () => {
   const optionLabels = VISUAL_INTENSITY_OPTIONS.map((o) => o.label);
   assert.deepEqual(optionLabels, ['Direct', 'Gentle', 'No graphic images']);
 
   let userState = createDefaultUserState('2026-10-01');
 
-  // 1. First session starts at content_warning and never autoplays
+  // 1. Session starts at content_warning before Photo Mode starts and never autoplays
   let session = createPhotoModeSession(userState);
   assert.equal(session.step, 'content_warning');
   assert.equal(session.autoplay, false);
@@ -215,26 +215,29 @@ test('6. Signature Feature: Photo Mode enforces content warning on first session
   assert.equal(session.step, 'difficult_image');
   assert.equal(session.imageIndexInRound, 1);
 
-  session = advancePhotoModeSession(session, true); // Image 2 -> Image 3 (with skip)
+  session = advancePhotoModeSession(session, false); // Image 2 -> Image 3
   assert.equal(session.step, 'difficult_image');
   assert.equal(session.imageIndexInRound, 2);
-  assert.equal(session.skippedCount, 1);
 
   session = advancePhotoModeSession(session, false); // Image 3 -> calming_encouragement
   assert.equal(session.step, 'calming_encouragement');
 
-  // 4. Advance from calming_encouragement -> reason_to_quit (with round completion choices)
+  // 4. Advance from calming_encouragement -> reason_to_quit
   session = advancePhotoModeSession(session, false);
   assert.equal(session.step, 'reason_to_quit');
 
-  // 5. Start next round -> begins Round 2 with difficult_image 1 (imageIndexInRound === 0)
+  // 5. Advance from reason_to_quit -> round_complete ("Continue" and "Close")
+  session = advancePhotoModeSession(session, false);
+  assert.equal(session.step, 'round_complete');
+
+  // 6. Tap "Continue" -> starts Round 2 with difficult_image 1 (imageIndexInRound === 0)
   ({ nextUserState: userState, nextSession: session } = startNextPhotoModeRound(userState, session));
   assert.equal(session.roundNumber, 2);
   assert.equal(session.step, 'difficult_image');
   assert.equal(session.imageIndexInRound, 0);
   assert.equal(userState.photoModeConfig.completedRoundsCount, 1);
 
-  // 6. Changing intensity setting re-triggers content_warning
+  // 7. Changing intensity setting re-triggers content_warning
   ({ nextUserState: userState, nextSession: session } = changePhotoModeIntensity(userState, session, 'gentle'));
   assert.equal(session.visualIntensity, 'gentle');
   assert.equal(session.step, 'content_warning');

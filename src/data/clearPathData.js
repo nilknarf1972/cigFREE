@@ -861,35 +861,68 @@ export const PHOTO_MODE_CALMING_STEPS = [
   {
     id: 'calm-sunrise-breath',
     title: 'Pause & Exhale — You Are Choosing Health Right Now',
+    photoUrl: '/images/calming/calm-sunrise-nps.jpg',
+    reasonPhotoUrl: '/images/calming/calm-ocean-nps.jpg',
     illustrationType: 'sunrise-horizon',
-    visualCategoryBadge: 'Calming Encouragement — Original Cleared Artwork',
-    caption: 'A quiet sunrise horizon reminding you that your body begins recovering the moment you stop smoking.',
+    visualCategoryBadge: 'Calming Photograph — U.S. National Park Service (Public Domain)',
+    caption: 'Sunrise over Shenandoah National Park (U.S. National Park Service, Public Domain).',
     screenReaderDescription:
-      'A calm sunrise glowing over peaceful green hills and a winding clear path.',
+      'A peaceful mountain sunrise glowing over Shenandoah National Park.',
     supportiveQuote:
-      '“Facing the reality of what tobacco does takes courage. Every single cigarette you choose not to smoke is an act of kindness toward your future self.”'
+      '“Facing the reality of what tobacco does takes courage. Every single cigarette you choose not to smoke is an act of kindness toward your future self.”',
+    licenseRecord: {
+      source: 'U.S. National Park Service / Wikimedia Commons (Shenandoah National Park)',
+      creator: 'U.S. National Park Service (Federal Government Photograph)',
+      licenseStatus: 'Public Domain in the United States (17 U.S.C. § 105 / PD-USGov-NPS)',
+      consentStatus: 'Landscape photograph — no identifiable individuals shown',
+      permittedUses: 'Cleared for educational & commercial display in Clear Path (The Primo IT Tech LLC)',
+      requiredAttribution: 'Photo: U.S. National Park Service (Public Domain)',
+      isPlaceholderForRealPhoto: false
+    }
   },
   {
     id: 'calm-forest-stream',
     title: 'Steady & Strong — One Round, One Day at a Time',
+    photoUrl: '/images/calming/calm-forest-nps.jpg',
+    reasonPhotoUrl: '/images/calming/calm-lake-nps.jpg',
     illustrationType: 'forest-breeze',
-    visualCategoryBadge: 'Calming Encouragement — Original Cleared Artwork',
-    caption: 'Sunlight filtering through tall evergreen trees beside a clear stream.',
+    visualCategoryBadge: 'Calming Photograph — U.S. National Park Service (Public Domain)',
+    caption: 'Tall Coast Redwoods in Redwood National Park (U.S. National Park Service, Public Domain).',
     screenReaderDescription:
-      'Warm sunlight streaming through peaceful evergreen trees alongside calm water.',
+      'Peaceful tall redwood trees in Redwood National Park.',
     supportiveQuote:
-      '“You do not have to be perfect to make real progress. Every smoke-free hour stays in your corner permanently.”'
+      '“You do not have to be perfect to make real progress. Every smoke-free hour stays in your corner permanently.”',
+    licenseRecord: {
+      source: 'U.S. National Park Service / Wikimedia Commons (Redwood National Park REDW2653)',
+      creator: 'U.S. National Park Service (Federal Government Photograph)',
+      licenseStatus: 'Public Domain in the United States (17 U.S.C. § 105 / PD-USGov-NPS)',
+      consentStatus: 'Landscape photograph — no identifiable individuals shown',
+      permittedUses: 'Cleared for educational & commercial display in Clear Path (The Primo IT Tech LLC)',
+      requiredAttribution: 'Photo: U.S. National Park Service (Public Domain)',
+      isPlaceholderForRealPhoto: false
+    }
   },
   {
     id: 'calm-harbor-beacon',
     title: 'You Are Stronger Than a 5-Minute Craving',
+    photoUrl: '/images/calming/calm-lake-nps.jpg',
+    reasonPhotoUrl: '/images/calming/calm-sunrise-nps.jpg',
     illustrationType: 'harbor-beacon',
-    visualCategoryBadge: 'Calming Encouragement — Original Cleared Artwork',
-    caption: 'A tranquil coastal lighthouse guiding a steady course across calm water.',
+    visualCategoryBadge: 'Calming Photograph — U.S. National Park Service (Public Domain)',
+    caption: 'Lake McDonald in Glacier National Park (U.S. National Park Service, Public Domain).',
     screenReaderDescription:
-      'A warm lighthouse beam shining across tranquil evening water.',
+      'Calm waters of Lake McDonald reflecting mountains in Glacier National Park.',
     supportiveQuote:
-      '“Cravings are temporary waves that crest and fade in minutes. Your lungs, throat, gums, and heart will thank you for years.”'
+      '“Cravings are temporary waves that crest and fade in minutes. Your lungs, throat, gums, and heart will thank you for years.”',
+    licenseRecord: {
+      source: 'U.S. National Park Service / Wikimedia Commons (Glacier National Park)',
+      creator: 'U.S. National Park Service (Federal Government Photograph)',
+      licenseStatus: 'Public Domain in the United States (17 U.S.C. § 105 / PD-USGov-NPS)',
+      consentStatus: 'Landscape photograph — no identifiable individuals shown',
+      permittedUses: 'Cleared for educational & commercial display in Clear Path (The Primo IT Tech LLC)',
+      requiredAttribution: 'Photo: U.S. National Park Service (Public Domain)',
+      isPlaceholderForRealPhoto: false
+    }
   }
 ];
 

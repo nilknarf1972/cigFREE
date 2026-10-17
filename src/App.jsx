@@ -300,29 +300,34 @@ export default function App() {
   };
 
   // ============================================================================
-  // PHOTO MODE HANDLERS (STRICT USER CONTROL, NO AUTOPLAY)
+  // PHOTO MODE HANDLERS (FULL-SCREEN VIEWER, STRICT USER CONTROL, NO AUTOPLAY)
   // ============================================================================
+  const [imageLoadFailed, setImageLoadFailed] = useState(false);
 
   const handleOpenPhotoMode = () => {
+    setImageLoadFailed(false);
     setPhotoSession((prev) => {
       const normalized = normalizeVisualIntensity(userState.visualIntensity);
-      const needsWarning =
-        userState.photoModeConfig?.warningAcknowledgedForIntensity !== normalized;
       return {
         ...prev,
         visualIntensity: normalized,
         roundLength: Number(userState.photoModeConfig?.roundLength) === 5 ? 5 : 3,
         deckLength: photoModeDeck.length,
-        step: needsWarning ? 'content_warning' : prev.step === 'finished' ? 'difficult_image' : prev.step,
+        imageIndexInRound: 0,
+        step: 'content_warning',
         isPaused: false
       };
     });
     setActiveScreen('images');
   };
 
-  const handleAcknowledgeWarningAndBeginRound = () => {
+  const handleAcknowledgeWarningAndBeginRound = (overrideLength = null) => {
+    setImageLoadFailed(false);
+    const chosenLength =
+      overrideLength === 3 || overrideLength === 5 ? overrideLength : photoSession.roundLength;
     const { nextUserState, nextSession } = acknowledgePhotoModeWarning(userState, {
       ...photoSession,
+      roundLength: chosenLength,
       deckLength: photoModeDeck.length
     });
     setUserState(nextUserState);
@@ -340,6 +345,7 @@ export default function App() {
   };
 
   const handleIntensityChangeEverywhere = (newIntensity) => {
+    setImageLoadFailed(false);
     const { nextUserState, nextSession } = changePhotoModeIntensity(
       userState,
       photoSession,
@@ -351,11 +357,12 @@ export default function App() {
     showTemporaryStatus(
       `Visual intensity set to "${
         VISUAL_INTENSITY_OPTIONS.find((o) => o.id === normalizeVisualIntensity(newIntensity))?.label
-      }". A brief content notice will appear before your next Photo Mode round.`
+      }".`
     );
   };
 
   const handleAdvancePhotoStep = (wasSkipped = false) => {
+    setImageLoadFailed(false);
     setActiveWarningIdx((prev) => prev + 1);
     setPhotoSession((prev) =>
       advancePhotoModeSession(
@@ -366,47 +373,59 @@ export default function App() {
         wasSkipped
       )
     );
-    if (wasSkipped) {
-      showTemporaryStatus('Skipped image. You remain in complete control of Photo Mode.');
-    }
   };
 
   const handleStartNextRound = () => {
+    setImageLoadFailed(false);
     const { nextUserState, nextSession } = startNextPhotoModeRound(userState, {
       ...photoSession,
       deckLength: photoModeDeck.length
     });
     setUserState(nextUserState);
     setPhotoSession(nextSession);
-    showTemporaryStatus(`Starting Round ${nextSession.roundNumber} (${nextSession.roundLength} images).`);
   };
 
   const handleExitPhotoMode = () => {
+    setImageLoadFailed(false);
     setPhotoSession((prev) => ({
       ...prev,
       isPaused: false
     }));
     setActiveScreen('today');
-    showTemporaryStatus('Exited Photo Mode. Your progress is saved.');
   };
 
   const handleJumpToOrganInPhotoMode = (cardId) => {
+    setImageLoadFailed(false);
     const targetCard = allImageCards.find((c) => c.id === cardId);
     if (!targetCard) return;
 
-    if (targetCard.intensity === 'direct' && normalizeVisualIntensity(userState.visualIntensity) !== 'direct') {
-      handleIntensityChangeEverywhere('direct');
-      return;
-    }
+    const normalized =
+      targetCard.intensity === 'direct'
+        ? 'direct'
+        : normalizeVisualIntensity(userState.visualIntensity);
+    const nextDeck = getPhotoModeDeck(allImageCards, normalized);
+    const idx = Math.max(
+      0,
+      nextDeck.findIndex((c) => c.id === cardId)
+    );
 
-    const idx = photoModeDeck.findIndex((c) => c.id === cardId);
-    if (idx >= 0) {
-      setPhotoSession((prev) => ({
+    if (normalized !== normalizeVisualIntensity(userState.visualIntensity)) {
+      setUserState((prev) => ({
         ...prev,
-        deckCursor: idx,
-        isPaused: false
+        visualIntensity: normalized
       }));
     }
+
+    setPhotoSession((prev) => ({
+      ...prev,
+      visualIntensity: normalized,
+      deckCursor: idx,
+      deckLength: nextDeck.length,
+      imageIndexInRound: 0,
+      step: 'content_warning',
+      isPaused: false
+    }));
+    setActiveScreen('images');
   };
 
   // ============================================================================
@@ -929,6 +948,494 @@ export default function App() {
             </p>
           </div>
         </main>
+      </div>
+    );
+  }
+
+  // ===========================================================================
+  // SIMPLE FULL-SCREEN PHOTO MODE IMAGE VIEWER
+  // No dashboard, cards, menus, explanations, stats, captions, or progress bars over images.
+  // ===========================================================================
+  if (activeScreen === 'images') {
+    const overlayBtnStyle = {
+      minHeight: '44px',
+      padding: '0.55rem 1.2rem',
+      borderRadius: '999px',
+      fontSize: '0.95rem',
+      fontWeight: 700,
+      cursor: 'pointer',
+      boxShadow: '0 4px 16px rgba(0, 0, 0, 0.65)',
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    };
+
+    const closeBtnStyle = {
+      ...overlayBtnStyle,
+      background: 'rgba(12, 16, 20, 0.84)',
+      color: '#FFFFFF',
+      border: '1.5px solid rgba(255, 255, 255, 0.85)'
+    };
+
+    const nextBtnStyle = {
+      ...overlayBtnStyle,
+      background: 'rgba(255, 255, 255, 0.95)',
+      color: '#0A0E12',
+      border: '1.5px solid #0A0E12',
+      fontWeight: 800
+    };
+
+    const controlsBarStyle = {
+      position: 'fixed',
+      bottom: '1.5rem',
+      left: '1.5rem',
+      right: '1.5rem',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      zIndex: 10002,
+      pointerEvents: 'none'
+    };
+
+    // 1. Pre-start Content Warning + Choose a round of 3 or 5 difficult images
+    if (photoSession.step === 'content_warning') {
+      return (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pm-fullscreen-warning-title"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
+            height: '100dvh',
+            background: '#090D10',
+            color: '#F7FAFC',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '1.75rem',
+            textAlign: 'center',
+            zIndex: 9999
+          }}
+        >
+          <div style={{ maxWidth: '480px', width: '100%' }}>
+            <h2
+              id="pm-fullscreen-warning-title"
+              style={{ margin: '0 0 0.75rem 0', fontSize: '1.4rem', fontWeight: 800 }}
+            >
+              Content Warning
+            </h2>
+            <p
+              style={{
+                margin: '0 0 1.5rem 0',
+                fontSize: '1rem',
+                lineHeight: 1.55,
+                color: '#CBD5E0'
+              }}
+            >
+              {normalizeVisualIntensity(userState.visualIntensity) === 'direct'
+                ? 'Photo Mode displays real, legally cleared clinical photographs of smoking-related damage. These images can be upsetting. You are in complete control—tap Next to advance at your own pace, or tap Close at any time.'
+                : 'Photo Mode displays non-graphic educational placeholders for smoking-related imagery. You are in complete control—tap Next to advance at your own pace, or tap Close at any time.'}
+            </p>
+
+            <p style={{ margin: '0 0 0.75rem 0', fontWeight: 700, fontSize: '1rem' }}>
+              Choose a round of 3 or 5 difficult images:
+            </p>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.75rem',
+                justifyContent: 'center',
+                flexWrap: 'wrap',
+                marginBottom: '1.5rem'
+              }}
+            >
+              {[3, 5].map((len) => {
+                const isSelected = photoSession.roundLength === len;
+                return (
+                  <button
+                    key={len}
+                    type="button"
+                    onClick={() => handlePhotoModeRoundLengthChange(len)}
+                    aria-pressed={isSelected}
+                    style={{
+                      minHeight: '48px',
+                      padding: '0.65rem 1.35rem',
+                      borderRadius: '999px',
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      background: isSelected ? '#FFFFFF' : 'rgba(255, 255, 255, 0.12)',
+                      color: isSelected ? '#090D10' : '#FFFFFF',
+                      border: isSelected
+                        ? '2px solid #FFFFFF'
+                        : '1.5px solid rgba(255, 255, 255, 0.45)'
+                    }}
+                  >
+                    {len} Difficult Images {isSelected ? '✓' : ''}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                gap: '0.85rem',
+                justifyContent: 'center',
+                flexWrap: 'wrap'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => handleAcknowledgeWarningAndBeginRound(photoSession.roundLength)}
+                style={{
+                  ...nextBtnStyle,
+                  padding: '0.7rem 1.6rem',
+                  fontSize: '1rem'
+                }}
+              >
+                Next
+              </button>
+              <button
+                type="button"
+                onClick={handleExitPhotoMode}
+                style={{
+                  ...closeBtnStyle,
+                  padding: '0.7rem 1.4rem',
+                  fontSize: '1rem'
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Difficult Image Full-Screen Step (1 at a time; ONLY the image + Next and Close buttons)
+    if (photoSession.step === 'difficult_image') {
+      const hasRealPhoto = Boolean(currentPhotoCard?.photoUrl && !imageLoadFailed);
+      return (
+        <div
+          role="region"
+          aria-label="Photo Mode Full-Screen Image Viewer"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
+            height: '100dvh',
+            background: '#000000',
+            zIndex: 9999,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {hasRealPhoto ? (
+            <img
+              src={currentPhotoCard.photoUrl}
+              alt={currentPhotoCard.screenReaderDescription || currentPhotoCard.title}
+              onError={() => setImageLoadFailed(true)}
+              style={{
+                width: '100vw',
+                height: '100dvh',
+                objectFit: 'contain',
+                display: 'block',
+                background: '#000000'
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100vw',
+                height: '100dvh',
+                background: '#0D1317',
+                color: '#E2E8F0',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem',
+                textAlign: 'center'
+              }}
+            >
+              <div
+                style={{
+                  padding: '0.4rem 0.9rem',
+                  borderRadius: '999px',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  fontSize: '0.85rem',
+                  fontWeight: 700,
+                  marginBottom: '1rem'
+                }}
+              >
+                PLACEHOLDER IMAGE (Development / Non-Graphic Mode)
+              </div>
+              <div style={{ maxWidth: '520px', width: '100%' }}>
+                <EducationalIllustration
+                  type={currentPhotoCard?.illustrationType || 'cilia-renewal'}
+                  title={currentPhotoCard?.title || 'Educational Placeholder'}
+                  description={
+                    currentPhotoCard?.screenReaderDescription ||
+                    'Labeled educational placeholder illustration'
+                  }
+                  reducedMotion={userState.reducedMotion}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={controlsBarStyle}>
+            <button
+              type="button"
+              onClick={handleExitPhotoMode}
+              style={{ ...closeBtnStyle, pointerEvents: 'auto' }}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAdvancePhotoStep(false)}
+              style={{ ...nextBtnStyle, pointerEvents: 'auto' }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Full-Screen Calming or Inspirational Image Step (ONLY the image + Next and Close buttons)
+    if (photoSession.step === 'calming_encouragement') {
+      const hasCalmPhoto = Boolean(currentCalmingCard?.photoUrl && !imageLoadFailed);
+      return (
+        <div
+          role="region"
+          aria-label="Photo Mode Calming Image"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
+            height: '100dvh',
+            background: '#000000',
+            zIndex: 9999,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {hasCalmPhoto ? (
+            <img
+              src={currentCalmingCard.photoUrl}
+              alt={currentCalmingCard.screenReaderDescription || currentCalmingCard.title}
+              onError={() => setImageLoadFailed(true)}
+              style={{
+                width: '100vw',
+                height: '100dvh',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100vw',
+                height: '100dvh',
+                background: '#0D1B1E',
+                color: '#E6FFFA',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '2rem',
+                textAlign: 'center'
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: '1rem' }}>
+                PLACEHOLDER CALMING IMAGE (Development Mode)
+              </div>
+              <div style={{ maxWidth: '520px', width: '100%' }}>
+                <EducationalIllustration
+                  type={currentCalmingCard?.illustrationType || 'sunrise-horizon'}
+                  title={currentCalmingCard?.title || 'Calming Image'}
+                  description={currentCalmingCard?.screenReaderDescription || 'Calming scene'}
+                  reducedMotion={userState.reducedMotion}
+                />
+              </div>
+            </div>
+          )}
+
+          <div style={controlsBarStyle}>
+            <button
+              type="button"
+              onClick={handleExitPhotoMode}
+              style={{ ...closeBtnStyle, pointerEvents: 'auto' }}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAdvancePhotoStep(false)}
+              style={{ ...nextBtnStyle, pointerEvents: 'auto' }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 4. Full-Screen Reason to Quit (short line of text over a suitable image + Next and Close)
+    if (photoSession.step === 'reason_to_quit') {
+      const hasReasonPhoto = Boolean(currentReasonToQuit?.photoUrl && !imageLoadFailed);
+      return (
+        <div
+          role="region"
+          aria-label="Photo Mode Reason to Quit"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            width: '100vw',
+            height: '100dvh',
+            background: '#000000',
+            zIndex: 9999,
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+        >
+          {hasReasonPhoto ? (
+            <img
+              src={currentReasonToQuit.photoUrl}
+              alt="Calming background for reason to quit"
+              onError={() => setImageLoadFailed(true)}
+              style={{
+                width: '100vw',
+                height: '100dvh',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: '100vw',
+                height: '100dvh',
+                background: '#0F2429'
+              }}
+            />
+          )}
+
+          {/* One short line of text over the suitable image */}
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '2rem',
+              pointerEvents: 'none',
+              zIndex: 10001
+            }}
+          >
+            <p
+              style={{
+                margin: 0,
+                padding: '0.85rem 1.4rem',
+                borderRadius: '14px',
+                background: 'rgba(8, 12, 16, 0.78)',
+                color: '#FFFFFF',
+                fontSize: 'clamp(1.1rem, 2.8vw, 1.55rem)',
+                fontWeight: 800,
+                textAlign: 'center',
+                maxWidth: '680px',
+                boxShadow: '0 8px 28px rgba(0, 0, 0, 0.65)'
+              }}
+            >
+              {currentReasonToQuit.shortLine}
+            </p>
+          </div>
+
+          <div style={controlsBarStyle}>
+            <button
+              type="button"
+              onClick={handleExitPhotoMode}
+              style={{ ...closeBtnStyle, pointerEvents: 'auto' }}
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => handleAdvancePhotoStep(false)}
+              style={{ ...nextBtnStyle, pointerEvents: 'auto' }}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // 5. After Reason to Quit: Show "Continue" and "Close"
+    return (
+      <div
+        role="region"
+        aria-label="Photo Mode Round Complete"
+        style={{
+          position: 'fixed',
+          inset: 0,
+          width: '100vw',
+          height: '100dvh',
+          background: '#090D10',
+          color: '#FFFFFF',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '2rem'
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleStartNextRound}
+            style={{
+              ...nextBtnStyle,
+              padding: '0.75rem 1.75rem',
+              fontSize: '1.05rem'
+            }}
+          >
+            Continue
+          </button>
+          <button
+            type="button"
+            onClick={handleExitPhotoMode}
+            style={{
+              ...closeBtnStyle,
+              padding: '0.75rem 1.55rem',
+              fontSize: '1.05rem'
+            }}
+          >
+            Close
+          </button>
+        </div>
       </div>
     );
   }
@@ -1698,659 +2205,6 @@ export default function App() {
                 </button>
               </div>
             </section>
-          </>
-        )}
-
-        {/* =====================================================================
-            SCREEN 3: SIGNATURE FEATURE — PHOTO MODE (REPEATABLE GUIDED SEQUENCE)
-           ===================================================================== */}
-        {activeScreen === 'images' && (
-          <>
-            <section className="card" aria-labelledby="photo-mode-heading">
-              {/* Top Control Header: Title, Round Length (3 or 5), Intensity Selector, Always-Visible Exit */}
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  flexWrap: 'wrap',
-                  gap: '0.75rem',
-                  marginBottom: '1rem'
-                }}
-              >
-                <div>
-                  <span className="pill-badge warning-pill">
-                    ★ SIGNATURE FEATURE • PHOTO MODE (NEVER AUTOPLAYS)
-                  </span>
-                  <h2
-                    id="photo-mode-heading"
-                    className="section-title"
-                    style={{ margin: '0.35rem 0 0 0' }}
-                  >
-                    <ImageIcon size={22} /> Guided Photo Mode Sequence
-                  </h2>
-                </div>
-
-                {/* Session Length (3 or 5) + Intensity Selector + Always-Visible Exit */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <label htmlFor="pm-round-length" className="form-label" style={{ margin: 0 }}>
-                    Round Length:
-                  </label>
-                  <select
-                    id="pm-round-length"
-                    className="form-input"
-                    style={{ minHeight: '40px', width: 'auto' }}
-                    value={photoSession.roundLength}
-                    onChange={(e) => handlePhotoModeRoundLengthChange(Number(e.target.value))}
-                  >
-                    <option value={3}>3 Images per Round</option>
-                    <option value={5}>5 Images per Round</option>
-                  </select>
-
-                  <label htmlFor="pm-intensity-select" className="form-label" style={{ margin: 0 }}>
-                    Intensity:
-                  </label>
-                  <select
-                    id="pm-intensity-select"
-                    className="form-input"
-                    style={{ minHeight: '40px', width: 'auto' }}
-                    value={normalizeVisualIntensity(userState.visualIntensity)}
-                    onChange={(e) => handleIntensityChangeEverywhere(e.target.value)}
-                  >
-                    {VISUAL_INTENSITY_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={handleExitPhotoMode}
-                    aria-label="Exit Photo Mode immediately"
-                  >
-                    <XCircle size={18} /> Exit Photo Mode
-                  </button>
-                </div>
-              </div>
-
-              {/* ===============================================================
-                  SEQUENCE STEP 1: BRIEF CONTENT WARNING (BEFORE FIRST SESSION OR ON INTENSITY CHANGE)
-                 =============================================================== */}
-              {photoSession.step === 'content_warning' && (
-                <div
-                  className="card card-warning"
-                  role="region"
-                  aria-labelledby="pm-warning-gate-title"
-                >
-                  <span className="pill-badge warning-pill">
-                    Step 1 • Content Notice &amp; Session Setup
-                  </span>
-                  <h3
-                    id="pm-warning-gate-title"
-                    className="section-title"
-                    style={{ marginTop: '0.5rem' }}
-                  >
-                    <ShieldAlert size={22} /> Content Warning Before Starting Photo Mode
-                  </h3>
-                  <p style={{ margin: '0 0 0.75rem 0' }}>
-                    {normalizeVisualIntensity(userState.visualIntensity) === 'direct'
-                      ? 'You have selected "Direct" intensity. This round will display real-life, legally cleared clinical pathology photographs of smoking-related damage (lungs, throat, lips, gums, tongue, and arteries). These images can be upsetting.'
-                      : normalizeVisualIntensity(userState.visualIntensity) === 'gentle'
-                      ? 'You have selected "Gentle" intensity. This round will display non-graphic educational illustrations showing how smoking affects the body and how tissues recover.'
-                      : 'You have selected "No graphic images." All graphic pathology photographs are hidden, and only uplifting educational diagrams will be shown.'}
-                  </p>
-                  <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                    <strong>You are always in control:</strong> Photo Mode never autoplays. You advance
-                    one image at a time, and you can <strong>Skip</strong> any image or{' '}
-                    <strong>Exit Photo Mode</strong> at any moment.
-                  </p>
-
-                  {/* Choose 3 or 5 Difficult Images per Round right on the Warning Screen */}
-                  <div className="form-group">
-                    <span className="form-label">
-                      Choose Session Length (3 or 5 Images per Round):
-                    </span>
-                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                      {[3, 5].map((len) => {
-                        const selected = photoSession.roundLength === len;
-                        return (
-                          <button
-                            key={len}
-                            type="button"
-                            className={`btn ${selected ? 'btn-primary' : 'btn-secondary'}`}
-                            onClick={() => handlePhotoModeRoundLengthChange(len)}
-                            aria-pressed={selected}
-                          >
-                            {len} Difficult Images per Round {selected ? '✓' : ''}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: '1rem' }}>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleAcknowledgeWarningAndBeginRound}
-                    >
-                      <Eye size={18} /> I Understand — Start Round {photoSession.roundNumber} (
-                      {photoSession.roundLength} Images) →
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => handleIntensityChangeEverywhere('no_graphic')}
-                    >
-                      <EyeOff size={18} /> Switch to “No graphic images”
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={handleExitPhotoMode}
-                    >
-                      Exit to Today
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ===============================================================
-                  SEQUENCE STEP 2 & 3: DIFFICULT IMAGES (1 AT A TIME, PROGRESS INDICATOR, NEXT/SKIP/EXIT)
-                 =============================================================== */}
-              {photoSession.step === 'difficult_image' && currentPhotoCard && (
-                <div className="card card-shock">
-                  {/* Top Progress Indicator Bar + Next / Skip / Exit */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '0.6rem',
-                      marginBottom: '0.75rem'
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <span className="pill-badge warning-pill" aria-live="polite">
-                        Round {photoSession.roundNumber} • Image {photoSession.imageIndexInRound + 1} of{' '}
-                        {photoSession.roundLength}
-                      </span>
-                      <span className="pill-badge price-pill">
-                        {currentPhotoCard.visualCategoryBadge}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className="btn btn-secondary"
-                        onClick={() => handleAdvancePhotoStep(true)}
-                        aria-label="Skip this image"
-                      >
-                        <SkipForward size={18} /> Skip
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        onClick={() => handleAdvancePhotoStep(false)}
-                      >
-                        {photoSession.imageIndexInRound + 1 < photoSession.roundLength
-                          ? `Next Image (${photoSession.imageIndexInRound + 2} of ${
-                              photoSession.roundLength
-                            }) →`
-                          : 'Next: Calming Encouragement →'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={handleExitPhotoMode}
-                      >
-                        Exit
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Visual Step Progress Dots */}
-                  <div
-                    style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.85rem' }}
-                    role="progressbar"
-                    aria-valuemin={1}
-                    aria-valuemax={photoSession.roundLength}
-                    aria-valuenow={photoSession.imageIndexInRound + 1}
-                    aria-label={`Image ${photoSession.imageIndexInRound + 1} of ${photoSession.roundLength} in Round ${photoSession.roundNumber}`}
-                  >
-                    {Array.from({ length: photoSession.roundLength }).map((_, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          flex: 1,
-                          height: '8px',
-                          borderRadius: '999px',
-                          background:
-                            idx <= photoSession.imageIndexInRound
-                              ? 'var(--brand-primary)'
-                              : 'var(--border-color)'
-                        }}
-                      />
-                    ))}
-                  </div>
-
-                  {/* Organ Quick-Jump Chips */}
-                  <div className="organ-filter-row" role="group" aria-label="Jump to organ">
-                    {ORGAN_SHORTCUTS.map((org) => (
-                      <button
-                        key={org.id}
-                        type="button"
-                        className={`organ-chip ${currentPhotoCard.id === org.id ? 'active' : ''}`}
-                        onClick={() => handleJumpToOrganInPhotoMode(org.id)}
-                      >
-                        {org.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {currentPhotoCard.catchyHook && (
-                    <div
-                      style={{
-                        fontSize: '0.9rem',
-                        fontWeight: 800,
-                        color: '#9B2C2C',
-                        textTransform: 'uppercase',
-                        marginBottom: '0.2rem'
-                      }}
-                    >
-                      ⚡ {currentPhotoCard.organTag}: {currentPhotoCard.catchyHook}
-                    </div>
-                  )}
-                  <h3 className="section-title" style={{ marginTop: 0 }}>
-                    {currentPhotoCard.title}
-                  </h3>
-
-                  {/* Display Real Clinical Photo (when in Direct mode) or Labeled Educational Illustration */}
-                  {currentPhotoCard.photoUrl ? (
-                    <div className="pathology-photo-frame">
-                      <img
-                        src={currentPhotoCard.photoUrl}
-                        alt={currentPhotoCard.screenReaderDescription}
-                        className="pathology-photo-img"
-                      />
-                      <div
-                        style={{
-                          width: '100%',
-                          padding: '0.6rem 0.9rem',
-                          background: '#162225',
-                          color: '#E6F4F1',
-                          fontSize: '0.84rem'
-                        }}
-                      >
-                        <strong>Caption &amp; Accessible Description:</strong>{' '}
-                        {currentPhotoCard.caption} ({currentPhotoCard.screenReaderDescription})
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <EducationalIllustration
-                        type={currentPhotoCard.illustrationType || 'cilia-renewal'}
-                        title={currentPhotoCard.title}
-                        description={currentPhotoCard.screenReaderDescription}
-                        reducedMotion={userState.reducedMotion}
-                      />
-                      <p
-                        style={{
-                          fontSize: '0.86rem',
-                          color: 'var(--text-secondary)',
-                          margin: '0.25rem 0 0.75rem 0'
-                        }}
-                      >
-                        <strong>Caption (Educational Illustration — Not a Real Patient Photo):</strong>{' '}
-                        {currentPhotoCard.caption}
-                      </p>
-                    </>
-                  )}
-
-                  <p style={{ margin: '0.5rem 0 0.75rem 0' }}>
-                    {currentPhotoCard.educationalMessage}
-                  </p>
-
-                  {/* Official Surgeon General / WHO Warning Banner */}
-                  <div className="surgeon-warning-box" role="note">
-                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: '#FEB2B2' }}>
-                      ⚠️ {currentOfficialWarning.badge}
-                    </div>
-                    <div style={{ fontWeight: 800, fontSize: '0.96rem', margin: '0.15rem 0' }}>
-                      {currentOfficialWarning.headline}
-                    </div>
-                    <div style={{ fontSize: '0.84rem', color: '#E2E8F0' }}>
-                      {currentOfficialWarning.detail}
-                    </div>
-                  </div>
-
-                  {/* Documented Image Rights & Attribution Bar */}
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-muted)',
-                      marginTop: '0.6rem'
-                    }}
-                  >
-                    <span>
-                      <strong>Documented License &amp; Attribution:</strong>{' '}
-                      {currentPhotoCard.licenseRecord?.requiredAttribution} •{' '}
-                      {currentPhotoCard.licenseRecord?.licenseStatus}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ minHeight: '36px', padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}
-                      onClick={() => setShowLicenseLedgerModal((prev) => !prev)}
-                    >
-                      <FileCheck2 size={14} />{' '}
-                      {showLicenseLedgerModal
-                        ? 'Hide Image Rights Ledger'
-                        : 'View / Record Image License Ledger'}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ===============================================================
-                  SEQUENCE STEP 4: CALMING, INSPIRATIONAL IMAGE OR SUPPORTIVE QUOTE
-                 =============================================================== */}
-              {photoSession.step === 'calming_encouragement' && (
-                <div
-                  className="card card-hero"
-                  role="region"
-                  aria-labelledby="pm-calming-step-heading"
-                >
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      flexWrap: 'wrap',
-                      gap: '0.5rem'
-                    }}
-                  >
-                    <span className="pill-badge price-pill">
-                      Round {photoSession.roundNumber} Complete ({photoSession.roundLength} of{' '}
-                      {photoSession.roundLength} Images Viewed) • Step 4: Calming Encouragement
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={handleExitPhotoMode}
-                    >
-                      Exit Photo Mode
-                    </button>
-                  </div>
-
-                  <h3
-                    id="pm-calming-step-heading"
-                    className="section-title"
-                    style={{ marginTop: '0.5rem' }}
-                  >
-                    <Sparkles size={22} /> {currentCalmingCard.title}
-                  </h3>
-
-                  <EducationalIllustration
-                    type={currentCalmingCard.illustrationType}
-                    title={currentCalmingCard.title}
-                    description={currentCalmingCard.screenReaderDescription}
-                    reducedMotion={userState.reducedMotion}
-                  />
-
-                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)' }}>
-                    <strong>Caption:</strong> {currentCalmingCard.caption}
-                  </p>
-
-                  <blockquote
-                    className="card"
-                    style={{
-                      margin: '0.85rem 0',
-                      fontSize: '1.05rem',
-                      fontWeight: 600,
-                      borderLeft: '4px solid var(--brand-primary)'
-                    }}
-                  >
-                    {currentCalmingCard.supportiveQuote}
-                  </blockquote>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={() => handleAdvancePhotoStep(false)}
-                    >
-                      Next: See Your Positive Reason to Quit →
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={handleExitPhotoMode}
-                    >
-                      Finish &amp; Return to Today
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* ===============================================================
-                  SEQUENCE STEP 5 & 6: POSITIVE REASON TO QUIT + CONTINUE / PAUSE / FINISH
-                 =============================================================== */}
-              {photoSession.step === 'reason_to_quit' && (
-                <div
-                  className="card card-hero"
-                  role="region"
-                  aria-labelledby="pm-reason-step-heading"
-                >
-                  <span className="pill-badge price-pill">
-                    Round {photoSession.roundNumber} • Step 5: Positive Reason to Quit &amp; Next Step
-                  </span>
-                  <h3
-                    id="pm-reason-step-heading"
-                    className="section-title"
-                    style={{ marginTop: '0.5rem' }}
-                  >
-                    <Heart size={22} /> Your Positive Reason to Quit: {currentReasonToQuit.motivationLabel}
-                  </h3>
-                  <p style={{ fontSize: '1rem', fontWeight: 600, margin: '0 0 0.85rem 0' }}>
-                    {currentReasonToQuit.motivationDescription}
-                  </p>
-
-                  <div className="card" style={{ marginBottom: '1rem' }}>
-                    <span className="pill-badge price-pill">Medically Reviewed Public-Health Benefit</span>
-                    <h4 style={{ margin: '0.4rem 0 0.25rem 0' }}>
-                      {currentReasonToQuit.benefitTitle}
-                    </h4>
-                    <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.94rem' }}>
-                      {currentReasonToQuit.benefitSummary}
-                    </p>
-                    <span className="form-hint">
-                      Citation: {currentReasonToQuit.benefitCitation}
-                    </span>
-                  </div>
-
-                  {/* Step 6: Choice to Continue With Another Round, Pause, or Finish */}
-                  <p style={{ fontWeight: 700, marginBottom: '0.65rem' }}>
-                    How would you like to proceed?
-                  </p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem' }}>
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      onClick={handleStartNextRound}
-                    >
-                      <PlayCircle size={18} /> Continue With Another Round (Round{' '}
-                      {photoSession.roundNumber + 1} • {photoSession.roundLength} Images) →
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      onClick={() => {
-                        setPhotoSession((prev) => ({ ...prev, isPaused: !prev.isPaused }));
-                        showTemporaryStatus('Photo Mode session paused. Resume whenever you are ready.');
-                      }}
-                    >
-                      <PauseCircle size={18} />
-                      {photoSession.isPaused ? 'Resume Session' : 'Pause Session'}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      onClick={handleExitPhotoMode}
-                    >
-                      <CheckCircle2 size={18} /> Finish Session &amp; Return to Today
-                    </button>
-                  </div>
-
-                  {photoSession.isPaused && (
-                    <div className="card" style={{ marginTop: '0.85rem' }} role="status">
-                      <strong>Session Paused:</strong> Take all the time you need. Nothing advances
-                      automatically—click “Continue With Another Round” or “Finish Session” whenever you
-                      are ready.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Expandable Image License & Consent Ledger Manager */}
-              {showLicenseLedgerModal && (
-                <div
-                  className="card"
-                  style={{ marginTop: '1rem' }}
-                  role="region"
-                  aria-labelledby="license-ledger-heading"
-                >
-                  <h3 id="license-ledger-heading" className="section-title">
-                    <FileCheck2 size={20} /> Documented Image Source, License &amp; Consent Ledger
-                  </h3>
-                  <p className="section-subtitle">
-                    Every real-life medical photograph is sourced from verified Public Domain (CDC PHIL,
-                    NIH/NCI) or Creative Commons medical archives with complete attribution recorded below.
-                    Generated or illustrative diagrams are never presented as real patient photographs.
-                  </p>
-
-                  <div className="grid-2" style={{ marginBottom: '1rem' }}>
-                    {allImageCards.map((card) => (
-                      <div
-                        key={card.id}
-                        className="card"
-                        style={{ background: 'var(--bg-elevated)', fontSize: '0.82rem' }}
-                      >
-                        <strong>{card.title}</strong>
-                        <div style={{ marginTop: '0.3rem' }}>
-                          <strong>Source:</strong> {card.licenseRecord?.source}
-                        </div>
-                        <div>
-                          <strong>Creator:</strong> {card.licenseRecord?.creator}
-                        </div>
-                        <div>
-                          <strong>License:</strong> {card.licenseRecord?.licenseStatus}
-                        </div>
-                        <div>
-                          <strong>Consent / Specimen Status:</strong> {card.licenseRecord?.consentStatus}
-                        </div>
-                        <div>
-                          <strong>Permitted Uses:</strong> {card.licenseRecord?.permittedUses}
-                        </div>
-                        <div>
-                          <strong>Attribution:</strong> {card.licenseRecord?.requiredAttribution}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <form
-                    onSubmit={handleAddCustomImageLicense}
-                    className="card"
-                    style={{ background: 'var(--bg-elevated)' }}
-                  >
-                    <h4 style={{ margin: '0 0 0.75rem 0' }}>Record an Additional Cleared Visual Asset</h4>
-                    {licenseFormError && (
-                      <p style={{ color: '#9B2C2C', fontWeight: 700 }} role="alert">
-                        {licenseFormError}
-                      </p>
-                    )}
-                    <div className="grid-2">
-                      <div className="form-group">
-                        <label htmlFor="lic-title" className="form-label">
-                          Image Title *
-                        </label>
-                        <input
-                          id="lic-title"
-                          type="text"
-                          className="form-input"
-                          placeholder="e.g. Healthy Alveoli Specimen"
-                          value={newLicenseForm.title}
-                          onChange={(e) =>
-                            setNewLicenseForm((p) => ({ ...p, title: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="lic-source" className="form-label">
-                          Documented Source *
-                        </label>
-                        <input
-                          id="lic-source"
-                          type="text"
-                          className="form-input"
-                          placeholder="e.g. CDC Public Health Image Library"
-                          value={newLicenseForm.source}
-                          onChange={(e) =>
-                            setNewLicenseForm((p) => ({ ...p, source: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="lic-status" className="form-label">
-                          License / Permission Status *
-                        </label>
-                        <input
-                          id="lic-status"
-                          type="text"
-                          className="form-input"
-                          placeholder="e.g. Public Domain / Written License"
-                          value={newLicenseForm.licenseStatus}
-                          onChange={(e) =>
-                            setNewLicenseForm((p) => ({ ...p, licenseStatus: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label htmlFor="lic-consent" className="form-label">
-                          Subject Informed Consent Status
-                        </label>
-                        <input
-                          id="lic-consent"
-                          type="text"
-                          className="form-input"
-                          placeholder="e.g. De-identified pathology specimen / Signed release"
-                          value={newLicenseForm.consentStatus}
-                          onChange={(e) =>
-                            setNewLicenseForm((p) => ({ ...p, consentStatus: e.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <button type="submit" className="btn btn-primary">
-                      Save License Record to Ledger
-                    </button>
-                  </form>
-                </div>
-              )}
-            </section>
-
-            {/* Personalized Reminders directly below Photo Mode! */}
-            {renderPersonalizedRemindersPanel()}
           </>
         )}
 
@@ -3147,6 +3001,139 @@ export default function App() {
                   <strong>Medical Disclaimer:</strong> {LEGAL_AND_PRICING_CONFIG.medicalDisclaimer.fullNotice}
                 </li>
               </ul>
+
+              <div style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowLicenseLedgerModal((prev) => !prev)}
+                >
+                  <FileCheck2 size={16} />{' '}
+                  {showLicenseLedgerModal
+                    ? 'Hide Documented Image License Ledger'
+                    : 'View / Record Documented Image License Ledger'}
+                </button>
+              </div>
+
+              {showLicenseLedgerModal && (
+                <div
+                  className="card"
+                  style={{ marginTop: '1rem' }}
+                  role="region"
+                  aria-labelledby="license-ledger-heading"
+                >
+                  <h4 id="license-ledger-heading" style={{ margin: '0 0 0.5rem 0' }}>
+                    Documented Image Source, License &amp; Consent Ledger
+                  </h4>
+                  <div className="grid-2" style={{ marginBottom: '1rem' }}>
+                    {allImageCards.map((card) => (
+                      <div
+                        key={card.id}
+                        className="card"
+                        style={{ background: 'var(--bg-elevated)', fontSize: '0.82rem' }}
+                      >
+                        <strong>{card.title}</strong>
+                        <div style={{ marginTop: '0.3rem' }}>
+                          <strong>Source:</strong> {card.licenseRecord?.source}
+                        </div>
+                        <div>
+                          <strong>Creator:</strong> {card.licenseRecord?.creator}
+                        </div>
+                        <div>
+                          <strong>License:</strong> {card.licenseRecord?.licenseStatus}
+                        </div>
+                        <div>
+                          <strong>Consent / Specimen Status:</strong> {card.licenseRecord?.consentStatus}
+                        </div>
+                        <div>
+                          <strong>Permitted Uses:</strong> {card.licenseRecord?.permittedUses}
+                        </div>
+                        <div>
+                          <strong>Attribution:</strong> {card.licenseRecord?.requiredAttribution}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <form
+                    onSubmit={handleAddCustomImageLicense}
+                    className="card"
+                    style={{ background: 'var(--bg-elevated)' }}
+                  >
+                    <h4 style={{ margin: '0 0 0.75rem 0' }}>Record an Additional Cleared Visual Asset</h4>
+                    {licenseFormError && (
+                      <p style={{ color: '#9B2C2C', fontWeight: 700 }} role="alert">
+                        {licenseFormError}
+                      </p>
+                    )}
+                    <div className="grid-2">
+                      <div className="form-group">
+                        <label htmlFor="lic-title" className="form-label">
+                          Image Title *
+                        </label>
+                        <input
+                          id="lic-title"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. Healthy Alveoli Specimen"
+                          value={newLicenseForm.title}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, title: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="lic-source" className="form-label">
+                          Documented Source *
+                        </label>
+                        <input
+                          id="lic-source"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. CDC Public Health Image Library"
+                          value={newLicenseForm.source}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, source: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="lic-status" className="form-label">
+                          License / Permission Status *
+                        </label>
+                        <input
+                          id="lic-status"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. Public Domain / Written License"
+                          value={newLicenseForm.licenseStatus}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, licenseStatus: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label htmlFor="lic-consent" className="form-label">
+                          Subject Informed Consent Status
+                        </label>
+                        <input
+                          id="lic-consent"
+                          type="text"
+                          className="form-input"
+                          placeholder="e.g. De-identified pathology specimen / Signed release"
+                          value={newLicenseForm.consentStatus}
+                          onChange={(e) =>
+                            setNewLicenseForm((p) => ({ ...p, consentStatus: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" className="btn btn-primary">
+                      Save License Record to Ledger
+                    </button>
+                  </form>
+                </div>
+              )}
             </section>
           </>
         )}

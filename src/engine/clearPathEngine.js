@@ -456,7 +456,16 @@ export function selectPositiveReasonToQuit(userState, roundNumber = 1) {
   const customReason =
     customList.length > 0 ? customList[(roundNumber - 1) % customList.length] : null;
 
+  const calmingStep =
+    PHOTO_MODE_CALMING_STEPS[(roundNumber - 1) % PHOTO_MODE_CALMING_STEPS.length];
+
+  const shortLine = customReason
+    ? `Reason to Quit: ${customReason}`
+    : `${chosenMotivation.label} — ${chosenBenefit.title}`;
+
   return {
+    shortLine,
+    photoUrl: calmingStep?.reasonPhotoUrl || '/images/calming/calm-ocean-nps.jpg',
     motivationLabel: customReason || chosenMotivation.label,
     motivationDescription: customReason
       ? `Your personal goal: "${customReason}"`
@@ -469,10 +478,8 @@ export function selectPositiveReasonToQuit(userState, roundNumber = 1) {
 
 /**
  * Initializes a Photo Mode session.
- * Enforces Rule 1: Show a brief content warning before the first session and whenever the user
- * changes the image intensity setting.
- * Enforces Rule 2: Let the user choose a session length of 3 or 5 difficult images per round.
- * Enforces Rule 7: Never autoplay (`autoplay: false`).
+ * Shows the content warning and 3-or-5 round selector before Photo Mode starts (never on top of every photo).
+ * Never autoplays (`autoplay: false`).
  */
 export function createPhotoModeSession(userState, allCards = DEFAULT_IMAGE_JOURNEY_CARDS) {
   const safeState = userState || createDefaultUserState();
@@ -480,13 +487,10 @@ export function createPhotoModeSession(userState, allCards = DEFAULT_IMAGE_JOURN
   const config = safeState.photoModeConfig || {};
   const roundLength = Number(config.roundLength) === 5 ? 5 : 3;
 
-  const warningAcknowledgedFor = config.warningAcknowledgedForIntensity || null;
-  const requiresContentWarning = warningAcknowledgedFor !== normalizedIntensity;
-
   const deck = getPhotoModeDeck(allCards, normalizedIntensity);
 
   return {
-    step: requiresContentWarning ? 'content_warning' : 'difficult_image',
+    step: 'content_warning',
     visualIntensity: normalizedIntensity,
     roundLength, // 3 or 5
     roundNumber: 1,
@@ -501,8 +505,8 @@ export function createPhotoModeSession(userState, allCards = DEFAULT_IMAGE_JOURN
 }
 
 /**
- * Acknowledges the brief content warning before the first session or after an intensity change,
- * transitioning Photo Mode into Step 3 (showing Image 1 of 3 or 5).
+ * Acknowledges the brief content warning before the session starts,
+ * transitioning Photo Mode into Step 2 (showing difficult image 1 of 3 or 5 full-screen).
  */
 export function acknowledgePhotoModeWarning(userState, session) {
   const safeState = userState || createDefaultUserState();
@@ -547,7 +551,7 @@ export function changePhotoModeRoundLength(userState, session, newRoundLength) {
 
 /**
  * Changes the image intensity setting ('direct' | 'gentle' | 'no_graphic').
- * Rule 1: Whenever the user changes the image intensity setting, show the brief content warning.
+ * Whenever the user changes the image intensity setting, show the brief content warning before starting.
  */
 export function changePhotoModeIntensity(
   userState,
@@ -587,10 +591,11 @@ export function changePhotoModeIntensity(
 }
 
 /**
- * Advances Photo Mode through its repeatable sequence:
+ * Advances Photo Mode through its full-screen sequence on each "Next" tap:
  * 1. 'content_warning' -> 'difficult_image' (1 of 3 or 5)
- * 2. 'difficult_image' (1..N) -> 'calming_encouragement' (after N images)
- * 3. 'calming_encouragement' -> 'reason_to_quit' (positive reason to quit + round choice)
+ * 2. 'difficult_image' (1..N) -> 'calming_encouragement' (after N difficult images)
+ * 3. 'calming_encouragement' -> 'reason_to_quit' (full-screen image with one short line of text)
+ * 4. 'reason_to_quit' -> 'round_complete' (shows "Continue" and "Close")
  */
 export function advancePhotoModeSession(session, wasSkipped = false) {
   if (!session) return null;
@@ -621,7 +626,7 @@ export function advancePhotoModeSession(session, wasSkipped = false) {
       };
     }
 
-    // Completed the selected number (3 or 5) of difficult images -> show calming encouragement
+    // Completed the selected number (3 or 5) of difficult images -> show full-screen calming image
     return {
       ...session,
       step: 'calming_encouragement',
@@ -636,6 +641,14 @@ export function advancePhotoModeSession(session, wasSkipped = false) {
     return {
       ...session,
       step: 'reason_to_quit',
+      isPaused: false
+    };
+  }
+
+  if (session.step === 'reason_to_quit') {
+    return {
+      ...session,
+      step: 'round_complete',
       isPaused: false
     };
   }
