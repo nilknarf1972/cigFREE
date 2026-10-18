@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'%3E%3Cpath d='M22 2.5L39 10.5V23.5C39 33.2 31.6 39.6 22 42C12.4 39.6 5 33.2 5 23.5V10.5L22 2.5Z' fill='%231e3a8a' stroke='%23fbbf24' stroke-width='2.5'/%3E%3Ctext x='22' y='27' text-anchor='middle' fill='%23ffffff' font-family='sans-serif' font-weight='900' font-size='13'%3EPIT%3C/text%3E%3C/svg%3E"
+  />
+  <title>Primo IT Tech LLC — Kudos, Open-Source Credits &amp; Community Attributions</title>
+  <style>
+    :root { --bg:#0b0f19; --panel:#111827; --border:#1e293b; --text:#f8fafc; --muted:#94a3b8; --accent:#0284c7; --glow:#38bdf8; --gold:#fbbf24; --emerald:#34d399; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; display:flex; flex-direction:column; }
+    header { background:linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); border-bottom:1px solid rgba(56,189,248,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.25); padding:20px 30px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; position:sticky; top:0; z-index:100; }
+    .pill { display:inline-block; font-size:10.5px; font-weight:800; color:var(--glow); background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.3); padding:3px 9px; border-radius:99px; margin-bottom:6px; letter-spacing:0.4px; text-transform:uppercase; }
+    .pill-gold { color:var(--gold); background:rgba(251,191,36,0.12); border-color:rgba(251,191,36,0.35); }
+    .pill-emerald { color:var(--emerald); background:rgba(16,185,129,0.14); border-color:rgba(16,185,129,0.35); }
+    h1 { font-size:21px; font-weight:800; color:#fff; }
+    .sub { font-size:13px; color:#cbd5e1; margin-top:2px; }
+    .btn { background:#1e293b; color:#e2e8f0; border:1px solid #334155; border-radius:99px; padding:8px 16px; font-size:12.5px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:6px; transition:all 0.15s ease; }
+    .btn:hover { border-color:var(--glow); color:#fff; }
+    .btn-primary { background:linear-gradient(135deg, #0284c7, #2563eb); color:#fff; border:1px solid rgba(56,189,248,0.5); }
+    .btn-gold { background:rgba(251,191,36,0.16); color:var(--gold); border:1px solid rgba(251,191,36,0.45); }
+    main { max-width:1400px; width:100%; margin:0 auto; padding:26px; flex:1; }
+    .section-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:20px; margin-bottom:22px; }
+    .section-card h2 { font-size:16.5px; color:#fff; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; }
+    .section-desc { font-size:13px; color:var(--muted); line-height:1.55; margin-bottom:16px; }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:14px; }
+    .proj { background:#0f172a; border:1px solid #1e293b; border-radius:10px; padding:15px; display:flex; flex-direction:column; justify-content:space-between; gap:10px; position:relative; }
+    .proj h3 { font-size:14.5px; color:#fff; margin-bottom:4px; }
+    .proj p { font-size:12.5px; color:var(--muted); line-height:1.5; }
+    .links { display:flex; gap:8px; flex-wrap:wrap; margin-top:4px; align-items:center; }
+    .links a, .links button { font-size:11.5px; font-weight:700; padding:5px 10px; border-radius:6px; text-decoration:none; background:#1e293b; color:#38bdf8; border:1px solid #334155; cursor:pointer; }
+    .links a:hover, .links button:hover { background:#0284c7; color:#fff; }
+    .form-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:12px; }
+    .input-group { display:flex; flex-direction:column; gap:5px; }
+    .input-group label { font-size:11.5px; font-weight:700; color:#cbd5e1; }
+    .input-group input, .input-group select, .input-group textarea { background:#0b0f19; border:1px solid #334155; color:#f8fafc; padding:9px 12px; border-radius:8px; font-size:13px; font-family:inherit; }
+    .input-group input:focus, .input-group select:focus, .input-group textarea:focus { outline:none; border-color:var(--glow); }
+    footer { background:#0f172a; color:#cbd5e1; padding:1.25rem 2rem; font-size:0.85rem; border-top:1px solid #1e293b; }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <a href="/" style="text-decoration:none;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);border:1.5px solid #38bdf8;box-shadow:0 0 18px rgba(56,189,248,0.22);padding:6px 12px 6px 8px;border-radius:10px;" title="Return to Master Portfolio Command Center">
+        <svg width="36" height="36" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="pitKudosShieldGrad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#06b6d4" />
+              <stop offset="55%" stop-color="#2563eb" />
+              <stop offset="100%" stop-color="#1e1b4b" />
+            </linearGradient>
+            <linearGradient id="pitKudosGoldAccent" x1="6" y1="4" x2="38" y2="40" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#fbbf24" />
+              <stop offset="100%" stop-color="#d97706" />
+            </linearGradient>
+          </defs>
+          <path d="M22 2.5L39 10.5V23.5C39 33.2 31.6 39.6 22 42C12.4 39.6 5 33.2 5 23.5V10.5L22 2.5Z" fill="url(#pitKudosShieldGrad)" stroke="url(#pitKudosGoldAccent)" stroke-width="2" />
+          <path d="M22 7V13M12 15L17 18M32 15L27 18M22 31V37" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.75" />
+          <circle cx="22" cy="7" r="1.8" fill="#fbbf24" />
+          <circle cx="12" cy="15" r="1.5" fill="#38bdf8" />
+          <circle cx="32" cy="15" r="1.5" fill="#38bdf8" />
+          <text x="22" y="26.5" text-anchor="middle" fill="#ffffff" font-family="Inter, system-ui, sans-serif" font-weight="900" font-size="12.5" letter-spacing="0.8">PIT</text>
+        </svg>
+        <div style="display:flex;flex-direction:column;line-height:1.15;">
+          <span style="font-size:12px;font-weight:900;letter-spacing:0.9px;color:#f8fafc;text-transform:uppercase;">Primo IT Tech</span>
+          <span style="font-size:9.5px;font-weight:700;letter-spacing:1.2px;color:#fbbf24;text-transform:uppercase;">LLC &bull; Florida</span>
+        </div>
+      </a>
+
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+          <span class="pill pill-gold" style="margin-bottom:0;">🤝 HALL OF KUDOS &amp; OPEN-SOURCE ATTRIBUTIONS</span>
+          <span class="pill pill-emerald" style="margin-bottom:0;">GENESIS 6/6 PILLARS</span>
+        </div>
+        <h1>Standing on the Shoulders of Giants &bull; People, Code &amp; Partners</h1>
+        <div class="sub">Gratitude and attribution to the collaborators, open-source authors, blueprints, and AI engines that helped build the Primo IT Tech LLC ecosystem</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+      <button type="button" class="btn btn-gold" onclick="toggleAddPersonPanel()">➕ Add Person / Kudos</button>
+      <a class="btn btn-primary" href="/">🏠 Back to Master Hub</a>
+      <a class="btn" href="https://github.com/nilknarf1972?tab=repositories" target="_blank" rel="noopener">🐙 GitHub Portfolio</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- Interactive "+ Add Person / Kudos" Drawer (Allows adding specific people anytime!) -->
+    <section class="section-card" id="addPersonPanel" style="display:none; border-color:rgba(251,191,36,0.5); box-shadow:0 0 25px rgba(251,191,36,0.12);">
+      <h2>
+        <span>➕ Add a Person, Mentor, Creator, or Project to the Hall of Kudos</span>
+        <button type="button" class="btn" onclick="toggleAddPersonPanel()" style="padding:4px 10px;font-size:11.5px;">✕ Close</button>
+      </h2>
+      <p class="section-desc">
+        Add anyone you want to thank at any time. Entries save immediately in your browser and can also be copied as a permanent JSON or Markdown snippet for <code>kudos.html</code> and <code>CREDITS.md</code>.
+      </p>
+      <form onsubmit="handleAddCustomKudos(event)">
+        <div class="form-grid">
+          <div class="input-group">
+            <label for="kName">Name or Handle *</label>
+            <input id="kName" type="text" required placeholder="e.g., Jane Doe (@janedoe)" />
+          </div>
+          <div class="input-group">
+            <label for="kBadge">Category / Badge *</label>
+            <select id="kBadge">
+              <option value="SPECIAL THANKS &amp; MENTORS">Special Thanks &amp; Mentors</option>
+              <option value="COLLABORATOR &amp; CO-BUILDER">Collaborator &amp; Co-Builder</option>
+              <option value="OPEN-SOURCE CREATOR">Open-Source Creator</option>
+              <option value="HARDWARE &amp; R&amp;D PARTNER">Hardware &amp; R&amp;D Partner</option>
+              <option value="COMMUNITY INSPIRATION">Community Inspiration</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <label for="kLinkLabel">Link Button Text</label>
+            <input id="kLinkLabel" type="text" placeholder="e.g., GitHub / Website / X Profile" />
+          </div>
+          <div class="input-group">
+            <label for="kLinkUrl">Link URL (https://...)</label>
+            <input id="kLinkUrl" type="url" placeholder="https://github.com/..." />
+          </div>
+        </div>
+        <div class="input-group" style="margin-bottom:14px;">
+          <label for="kDesc">What They Helped Create / Why They Get Kudos *</label>
+          <textarea id="kDesc" rows="2" required placeholder="Describe their code, blueprint, mentorship, or contribution across your projects..."></textarea>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <button type="submit" class="btn btn-primary">✓ Save to Hall of Kudos</button>
+          <button type="button" class="btn" onclick="copyPermanentSnippet()">📋 Copy Permanent Code Snippet</button>
+          <span id="kudosStatusMsg" style="font-size:12px;color:var(--emerald);font-weight:700;"></span>
+        </div>
+      </form>
+    </section>
+
+    <!-- Section 1: People, Collaborators & Upstream Creators -->
+    <section class="section-card">
+      <h2>
+        <span>👨‍💻 1. People, Collaborators &amp; Community Blueprints</span>
+        <button type="button" class="btn btn-gold" onclick="toggleAddPersonPanel()" style="padding:5px 12px;font-size:11.5px;">➕ Add Person Later</button>
+      </h2>
+      <p class="section-desc">
+        Direct collaborators, upstream open-source authors, and community builders whose code, blueprints, and research helped shape the 34+ applications in the Primo IT Tech LLC suite.
+      </p>
+      <div class="grid" id="peopleGrid">
+        <div class="proj">
+          <div>
+            <span class="pill pill-gold">FOUNDER &amp; PRINCIPAL ARCHITECT</span>
+            <h3>🛡️ Keith Franklin (@nilknarf1972)</h3>
+            <p>Founder &amp; Managing Member of <strong>Primo IT Tech LLC</strong> (Jupiter, Florida). Principal architect across all 34+ credentialing studios, SQL Server BLOB migration engines, hardware prototypes (Primo IT Tech Grinder™ Proto 02, Wingy Dingy WD-001), and the Universal Portfolio Command Center.</p>
+          </div>
+          <div class="links">
+            <a href="https://github.com/nilknarf1972" target="_blank" rel="noopener">GitHub @nilknarf1972 ↗</a>
+            <a href="/">34-Portal Hub ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">COLLABORATOR &amp; UPSTREAM ARCHITECT</span>
+            <h3>⚡ Brandon Ducar (@BrandonDucar)</h3>
+            <p>Core engineering collaborator and upstream creator across <strong>DreamNet</strong> (Genesis Protocol lore &amp; architecture), <strong>ToolGym</strong> (agentic tool-use qualification harness), <strong>Proof Drop (ZABAL)</strong>, <strong>FlockGPScameras</strong>, and <strong>DeBlobisizer-Pro</strong>.</p>
+          </div>
+          <div class="links">
+            <a href="https://github.com/BrandonDucar" target="_blank" rel="noopener">GitHub @BrandonDucar ↗</a>
+            <a href="https://github.com/BrandonDucar/toolgym" target="_blank" rel="noopener">ToolGym Repo ↗</a>
+            <a href="https://github.com/BrandonDucar/proof-drop-zabal" target="_blank" rel="noopener">Proof Drop Repo ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">OPEN-SOURCE VIDEO ENGINE</span>
+            <h3>🎥 Harry (@harry0703) &amp; Contributors</h3>
+            <p>Creator and community contributors (including mohit-twelvelabs, Paulo C. Benetti, kapil971390, nhatanh2996, EvolinkAI) of <strong>MoneyPrinterTurbo</strong>, powering automated short-form video synthesis and captioning workflows.</p>
+          </div>
+          <div class="links">
+            <a href="https://github.com/harry0703/MoneyPrinterTurbo" target="_blank" rel="noopener">MoneyPrinterTurbo GitHub ↗</a>
+            <a href="/moneyprinterturbo/">Local Portal ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">OPEN-SOURCE MONTAGE ENGINE</span>
+            <h3>🎞️ Calesthio AI Labs (@calesthio) &amp; Team</h3>
+            <p>Creators and contributors (Calesthio, Daniel Liu, Roger Brogan, yatchiya) of <strong>OpenMontage</strong>, providing the production backlot library and automated video montage pipeline architecture.</p>
+          </div>
+          <div class="links">
+            <a href="https://github.com/calesthio/OpenMontage" target="_blank" rel="noopener">OpenMontage GitHub ↗</a>
+            <a href="/openmontage/">Local Portal ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">COMMUNITY HARDWARE / ADB BLUEPRINT</span>
+            <h3>📺 @justansub — Android TV Revival Blueprint</h3>
+            <p>Inspiration and ADB optimization blueprint behind <strong>Rea TV (<code>rea_TV</code>)</strong>, turning sluggish Android TVs into fast, ad-free custom home screens with reversible package debloating and guardrails.</p>
+          </div>
+          <div class="links">
+            <a href="https://x.com/justansub/status/2111571310187053361" target="_blank" rel="noopener">@justansub Blueprint on X ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">WEB3 &amp; VERIFIABLE RECEIPTS COMMUNITY</span>
+            <h3>🧾 ZABAL Gamez &amp; POIDH Community</h3>
+            <p>Community catalyst for <strong>Proof Drop</strong>—creating client-side SHA-256 build receipts and verifiable evidence claims for open-source and Farcaster/X builders.</p>
+          </div>
+          <div class="links">
+            <a href="https://proof-drop-zabal.pages.dev" target="_blank" rel="noopener">Proof Drop Live ↗</a>
+            <a href="/proof-drop-zabal/">Local Portal ↗</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: AI Pair-Programming & Synthesis Fleet -->
+    <section class="section-card">
+      <h2>🤖 2. AI Pair-Programming, Research &amp; Synthesis Fleet</h2>
+      <p class="section-desc">
+        Modern software and hardware engineering thrives on human-AI collaboration. Kudos to the frontier AI platforms and agentic frameworks used to prototype, audit, test, and unify this portfolio.
+      </p>
+      <div class="grid">
+        <div class="proj">
+          <div>
+            <span class="pill pill-emerald">AGENTIC IDE &amp; MULTIMODAL ENGINE</span>
+            <h3>🚀 Google Antigravity (AGY) &amp; Gemini</h3>
+            <p>Autonomous workspace orchestration, 3D dual-axis mechanical simulations (<strong>WingyDingy v2.0 AGY</strong>), fault-tolerant research harnesses (<strong>resilient-nobel</strong>), CoachMark guided tours, and Genesis 6-Pillar system unification.</p>
+          </div>
+          <div class="links">
+            <a href="https://deepmind.google/" target="_blank" rel="noopener">Google DeepMind ↗</a>
+            <a href="/wingydingy_agy/">WingyDingy AGY ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">REASONING &amp; QUANT ARCHITECTURE</span>
+            <h3>🧠 Anthropic Claude</h3>
+            <p>Co-engineering on <strong>claude-trading-system</strong> (multi-agent market regime classification &amp; Kelly sizing), <strong>ceexporter-claude</strong> (.CDF binary/XML parser), and Android TV ADB debloat scripting.</p>
+          </div>
+          <div class="links">
+            <a href="https://www.anthropic.com/" target="_blank" rel="noopener">Anthropic Claude ↗</a>
+            <a href="/claude-trading-system/">Claude Trading Portal ↗</a>
+            <a href="/ceexporter-claude/">CEExporter Claude ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">REAL-TIME SPECS &amp; HARDWARE R&amp;D</span>
+            <h3>⚡ xAI Grok</h3>
+            <p>Co-engineering on <strong>CDF Exporter (ceexporter-grok)</strong>, mechanical CAD/BOM synthesis for <strong>Wingy Dingy</strong> &amp; <strong>Primo IT Tech Grinder™</strong>, and NOVA Group 4 / California AB 1264 marker lexicons in <strong>SLOPDetector</strong>.</p>
+          </div>
+          <div class="links">
+            <a href="https://x.ai/" target="_blank" rel="noopener">xAI Grok ↗</a>
+            <a href="/cdf-exporter/">CDF Exporter Grok ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">DETERMINISTIC PIPELINES &amp; EVIDENCE</span>
+            <h3>📊 OpenAI Codex / ChatGPT &amp; Duck.ai</h3>
+            <p>Deterministic walk-forward factor modeling in <strong>codex-trading-system</strong>, ToolGym OpenAI Sites deployment, and the <strong>Duck.ai</strong> transparent food-label evidence specification in <strong>SLOPDetector</strong>.</p>
+          </div>
+          <div class="links">
+            <a href="https://openai.com/" target="_blank" rel="noopener">OpenAI ↗</a>
+            <a href="https://duck.ai/" target="_blank" rel="noopener">Duck.ai ↗</a>
+            <a href="/codex-trading-system/">Codex Trading Portal ↗</a>
+            <a href="/slopdetector/">SLOPDetector ↗</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Open-Source Frameworks, Libraries & Public APIs -->
+    <section class="section-card">
+      <h2>🛠️ 3. Open-Source Libraries, Frameworks &amp; Public Data APIs</h2>
+      <p class="section-desc">
+        Grateful acknowledgment to the open-source maintainers and public data initiatives whose libraries power our user interfaces, 2D/3D canvases, hardware bridges, and databases.
+      </p>
+      <div class="grid">
+        <div class="proj">
+          <div>
+            <span class="pill">WEB, 2D CANVAS &amp; 3D GRAPHICS</span>
+            <h3>🎨 React, Vite, TypeScript, Konva.js &amp; Three.js</h3>
+            <p><strong>React 19</strong>, <strong>Vite</strong>, <strong>TypeScript</strong>, and <strong>Tailwind CSS</strong> power our responsive web portals; <strong>Konva.js</strong> drives interactive CR80 badge layout in <em>PrimotITcdfimporter</em> &amp; <em>CardLayoutStudio</em>; <strong>Three.js</strong> powers 3D CAD and wardrobe visualization.</p>
+          </div>
+          <div class="links">
+            <a href="https://react.dev/" target="_blank" rel="noopener">React ↗</a>
+            <a href="https://vite.dev/" target="_blank" rel="noopener">Vite ↗</a>
+            <a href="https://konvajs.org/" target="_blank" rel="noopener">Konva.js ↗</a>
+            <a href="https://threejs.org/" target="_blank" rel="noopener">Three.js ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">DESKTOP, MOBILE &amp; ENTERPRISE DATA</span>
+            <h3>🪟 .NET 8, WPF, .NET MAUI &amp; SQL Server</h3>
+            <p><strong>.NET 8</strong>, <strong>WPF</strong>, and <strong>.NET MAUI</strong> power our native Windows utilities (<em>Primo-IT-Tech-BLOBer</em>, <em>GABOO</em>, <em>PPKiosk</em>) and cross-platform optical scanners (<em>ID-Access_NETmaui</em>), paired with high-throughput <code>SqlBulkCopy</code> database pipelines.</p>
+          </div>
+          <div class="links">
+            <a href="https://dotnet.microsoft.com/" target="_blank" rel="noopener">.NET Platform ↗</a>
+            <a href="https://learn.microsoft.com/en-us/dotnet/maui/" target="_blank" rel="noopener">.NET MAUI ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">BACKEND, MEDIA &amp; TUNNEL INFRASTRUCTURE</span>
+            <h3>🐍 Python, Flask, FastAPI, FFmpeg &amp; Cloudflare</h3>
+            <p><strong>Python</strong>, <strong>Flask</strong>, and <strong>FastAPI</strong> run our local parsers and trading engines; <strong>FFmpeg</strong> and <strong>Edge-TTS</strong> synthesize media in <em>cartoon-video-studio</em>; <strong>Node.js</strong> and <strong>Cloudflare Quick Tunnels (<code>cloudflared</code>)</strong> bridge local ports safely to the web.</p>
+          </div>
+          <div class="links">
+            <a href="https://www.python.org/" target="_blank" rel="noopener">Python ↗</a>
+            <a href="https://ffmpeg.org/" target="_blank" rel="noopener">FFmpeg ↗</a>
+            <a href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/" target="_blank" rel="noopener">Cloudflare Tunnels ↗</a>
+          </div>
+        </div>
+
+        <div class="proj">
+          <div>
+            <span class="pill">PUBLIC DATA &amp; MAPPING STANDARDS</span>
+            <h3>🌍 Open Food Facts, USDA &amp; OpenStreetMap</h3>
+            <p><strong>Open Food Facts</strong> and <strong>USDA FoodData Central</strong> provide nutrition and ingredient baselines for <em>SLOPDetector</em>; <strong>OpenStreetMap</strong> and <strong>Leaflet</strong> power geospatial visualization in <em>FlockGPScameras</em>.</p>
+          </div>
+          <div class="links">
+            <a href="https://world.openfoodfacts.org/" target="_blank" rel="noopener">Open Food Facts ↗</a>
+            <a href="https://fdc.nal.usda.gov/" target="_blank" rel="noopener">USDA FoodData ↗</a>
+            <a href="https://www.openstreetmap.org/" target="_blank" rel="noopener">OpenStreetMap ↗</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Legal Boundary & Open-Source Attribution Shield -->
+    <section class="section-card" style="border-color:rgba(56,189,248,0.35);">
+      <h2>⚖️ 4. Open-Source License Compliance &amp; Intellectual Property Notice</h2>
+      <div style="font-size:12.8px;color:#cbd5e1;line-height:1.65;display:flex;flex-direction:column;gap:8px;">
+        <p>
+          <strong>1. Gratitude &amp; License Attribution:</strong> All third-party open-source repositories, frameworks, libraries, and community blueprints listed on this page remain the intellectual property of their respective authors and are utilized pursuant to their applicable open-source licenses (including MIT, Apache-2.0, BSD, and Creative Commons).
+        </p>
+        <p>
+          <strong>2. Reservation of Primo IT Tech LLC Proprietary Rights:</strong> Crediting open-source libraries, upstream inspirations, collaborators, or AI development tools on this page does <strong>not</strong> transfer, waive, or dilute <strong>Primo IT Tech LLC’s</strong> exclusive copyright and ownership over its proprietary source code, credential migration schemas, hardware CAD/BOM specifications, or trademarks (&copy; 2026 Primo IT Tech LLC, State of Florida. All Rights Reserved).
+        </p>
+        <p>
+          <strong>3. No Implied Endorsement &amp; 17 U.S.C. &sect; 1201(f) Interoperability:</strong> Primo IT Tech LLC is an independent Florida technology company. Reference to any third-party creator, vendor, platform, or trademark is strictly for attribution and nominative fair use and does not imply sponsorship or endorsement by those parties.
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div style="max-width:1400px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+      <div>
+        <div style="font-weight:700;color:#f8fafc;">&copy; 2026 Primo IT Tech LLC (Jupiter, Florida) &bull; Hall of Kudos &amp; Open-Source Attributions &bull; Genesis 6/6 Active</div>
+        <div style="font-size:0.78rem;color:#94a3b8;">Standing on the shoulders of open-source giants while protecting Florida engineering IP</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-gold" onclick="toggleAddPersonPanel()" style="padding:6px 14px;font-size:0.8rem;">➕ Add Person / Kudos</button>
+        <a class="btn" href="/" style="padding:6px 14px;font-size:0.8rem;">🏠 Master Portfolio Hub</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ============================================================================
+    // PERMANENT CUSTOM KUDOS LIST (Edit this array anytime to hardcode new people)
+    // You can also add people right in the browser using the "+ Add Person" button!
+    // ============================================================================
+    const PERMANENT_CUSTOM_KUDOS = [
+      // Example:
+      // { name: "Your Friend / Mentor Name", badge: "SPECIAL THANKS & MENTORS", desc: "Helped test hardware prototypes and gave early feedback.", linkLabel: "Website ↗", linkUrl: "https://example.com" }
+    ];
+
+    const STORAGE_KEY = "primoit.custom_kudos.v1";
+
+    function loadSavedKudos() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveCustomKudosList(list) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+      } catch (e) {}
+    }
+
+    function escapeHtml(str) {
+      return String(str || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function renderCustomKudosCards() {
+      const grid = document.getElementById("peopleGrid");
+      if (!grid) return;
+      grid.querySelectorAll(".custom-kudos-card").forEach(el => el.remove());
+
+      const combined = [
+        ...PERMANENT_CUSTOM_KUDOS.map(item => ({ ...item, permanent: true })),
+        ...loadSavedKudos().map((item, idx) => ({ ...item, permanent: false, idx }))
+      ];
+
+      combined.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "proj custom-kudos-card";
+        card.style.borderColor = "rgba(251,191,36,0.4)";
+        const linkHtml = item.linkUrl
+          ? `<a href="${escapeHtml(item.linkUrl)}" target="_blank" rel="noopener">${escapeHtml(item.linkLabel || "Visit Link")} ↗</a>`
+          : "";
+        const removeBtn = !item.permanent
+          ? `<button type="button" onclick="removeCustomKudos(${item.idx})" style="color:#f87171;border-color:rgba(248,113,113,0.35);">Remove</button>`
+          : "";
+        card.innerHTML = `
+          <div>
+            <span class="pill pill-gold">${escapeHtml(item.badge || "SPECIAL THANKS")}</span>
+            <h3>🌟 ${escapeHtml(item.name)}</h3>
+            <p>${escapeHtml(item.desc)}</p>
+          </div>
+          <div class="links">
+            ${linkHtml}
+            ${removeBtn}
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function toggleAddPersonPanel() {
+      const panel = document.getElementById("addPersonPanel");
+      if (!panel) return;
+      const isHidden = panel.style.display === "none";
+      panel.style.display = isHidden ? "block" : "none";
+      if (isHidden) {
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        const input = document.getElementById("kName");
+        if (input) input.focus();
+      }
+    }
+
+    function handleAddCustomKudos(e) {
+      e.preventDefault();
+      const name = document.getElementById("kName").value.trim();
+      const badge = document.getElementById("kBadge").value;
+      const desc = document.getElementById("kDesc").value.trim();
+      const linkLabel = document.getElementById("kLinkLabel").value.trim() || "Profile / Link";
+      const linkUrl = document.getElementById("kLinkUrl").value.trim();
+      if (!name || !desc) return;
+
+      const list = loadSavedKudos();
+      list.push({ name, badge, desc, linkLabel, linkUrl, addedAt: new Date().toISOString() });
+      saveCustomKudosList(list);
+      renderCustomKudosCards();
+
+      document.getElementById("kName").value = "";
+      document.getElementById("kDesc").value = "";
+      document.getElementById("kLinkLabel").value = "";
+      document.getElementById("kLinkUrl").value = "";
+      const msg = document.getElementById("kudosStatusMsg");
+      if (msg) {
+        msg.textContent = "✓ Added to Hall of Kudos!";
+        setTimeout(() => { msg.textContent = ""; }, 4000);
+      }
+    }
+
+    function removeCustomKudos(idx) {
+      const list = loadSavedKudos();
+      list.splice(idx, 1);
+      saveCustomKudosList(list);
+      renderCustomKudosCards();
+    }
+
+    function copyPermanentSnippet() {
+      const all = [...PERMANENT_CUSTOM_KUDOS, ...loadSavedKudos()];
+      const snippet = "const PERMANENT_CUSTOM_KUDOS = " + JSON.stringify(all, null, 2) + ";";
+      navigator.clipboard.writeText(snippet).then(() => {
+        const msg = document.getElementById("kudosStatusMsg");
+        if (msg) {
+          msg.textContent = "📋 Copied permanent JSON snippet to clipboard!";
+          setTimeout(() => { msg.textContent = ""; }, 4000);
+        }
+      });
+    }
+
+    renderCustomKudosCards();
+  </script>
+</body>
+</html>

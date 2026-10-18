@@ -78,3 +78,9 @@ npx expo start
 - [`src/App.jsx`](./src/App.jsx) — Main 8-screen application interface
 - [`mobile/`](./mobile/app.json) — iOS App Store & Google Play Store Expo configuration (`com.primoittech.clearpath`)
 - [`tests/clearPathEngine.test.mjs`](./tests/clearPathEngine.test.mjs) — Automated unit tests
+
+
+---
+### 🤝 Hall of Kudos & Open-Source Attributions
+See [CREDITS.md](./CREDITS.md) or open [kudos.html](./kudos.html) to view the people, open-source creators, libraries, and AI pair-programming partners recognized across the **Primo IT Tech LLC** ecosystem.
+
